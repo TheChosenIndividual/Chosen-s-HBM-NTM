@@ -352,8 +352,8 @@ public class Fluids {
 		metaOrder.add(MUG_HOT);
 		metaOrder.add(BLOOD);
 		metaOrder.add(BLOOD_HOT);
-		metaOrder.add(SODIUM);
-		metaOrder.add(SODIUM_HOT);
+		metaOrder.add(COOLANT_SALT);
+		metaOrder.add(COOLANT_SALT_HOT);
 		metaOrder.add(THORIUM_SALT);
 		metaOrder.add(THORIUM_SALT_HOT);
 		metaOrder.add(THORIUM_SALT_DEPLETED);
