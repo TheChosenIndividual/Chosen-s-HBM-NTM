@@ -520,8 +520,8 @@ public class Fluids {
 		HEAVYWATER.addTraits(new FT_Heatable().setEff(HeatingType.PWR, 1.0D).addStep(300, 1, HEAVYWATER_HOT, 1), new FT_PWRModerator(1.25D));
 		HEAVYWATER_HOT.addTraits(new FT_Coolable(HEAVYWATER, 1, 1, 300).setEff(CoolingType.HEATEXCHANGER, 1.0D));
 		
-		COOLANT_SALT.addTraits(new FT_Heatable().setEff(HeatingType.BOILER, 1.0D).setEff(HeatingType.HEATEXCHANGER, 1.0D).addStep(1, 1, COOLANT_SALT_HOT, 400),(new FT_Heatable().setEff(HeatingType.PWR, 2.5D).addStep(400, 1, COOLANT_SALT_HOT, 1)));
-		COOLANT_SALT_HOT.addTraits(new FT_Coolable(), 1, 1, COOLANT_SALT, 400).setEff(CoolingType.HEATEXCHANGER, 1.0D));
+		COOLANT_SALT.addTraits(new FT_Heatable().setEff(HeatingType.BOILER, 2.0D).addStep(1, 1, COOLANT_SALT_HOT).setEff(HeatingType.HEATEXCHANGER, 1.0D).addStep(1, 1, COOLANT_SALT_HOT, 400),(new FT_Heatable().setEff(HeatingType.PWR, 2.5D).addStep(400, 1, COOLANT_SALT_HOT, 1)));
+		COOLANT_SALT_HOT.addTraits(new FT_Coolable(COOLANT_SALT, 1, 1, 400).setEff(CoolingType.HEATEXCHANGER, 1.0D));
 		
 		THORIUM_SALT.addTraits(new FT_Heatable().setEff(HeatingType.PWR, 1.0D).addStep(425, 1, THORIUM_SALT_HOT, 1), new FT_PWRModerator(2.5D));
 		THORIUM_SALT_HOT.addTraits(new FT_Coolable(THORIUM_SALT_DEPLETED, 1, 1, 425).setEff(CoolingType.HEATEXCHANGER, 1.0D));
