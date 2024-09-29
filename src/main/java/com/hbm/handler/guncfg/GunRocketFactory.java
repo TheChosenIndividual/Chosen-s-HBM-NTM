@@ -10,14 +10,12 @@ import com.hbm.handler.BulletConfiguration;
 import com.hbm.handler.GunConfiguration;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.items.ModItems;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.items.ItemAmmoEnums.AmmoRocket;
 import com.hbm.lib.HbmCollection.EnumGunManufacturer;
 import com.hbm.render.anim.BusAnimation;
-import com.hbm.render.anim.BusAnimationKeyframe;
 import com.hbm.render.anim.BusAnimationSequence;
 import com.hbm.render.anim.HbmAnimations.AnimType;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
-
 import net.minecraft.block.material.Material;
 import net.minecraft.world.World;
 
@@ -84,23 +82,23 @@ public class GunRocketFactory {
 		
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("QUADRO_RECOIL", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, -0.5, 50)
-						.addKeyframePosition(0, 0, 0, 50)
+						.addPos(0, 0, -0.5, 50)
+						.addPos(0, 0, 0, 50)
 						)
 				);
 		
 		config.animations.put(AnimType.RELOAD, new BusAnimation()
 				.addBus("QUADRO_RELOAD_ROTATE", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 60, 750)
-						.addKeyframePosition(0, 0, 60, 3500)
-						.addKeyframePosition(0, 0, 0, 750)
+						.addPos(0, 0, 60, 750)
+						.addPos(0, 0, 60, 3500)
+						.addPos(0, 0, 0, 750)
 						)
 				.addBus("QUADRO_RELOAD_PUSH", new BusAnimationSequence()
-						.addKeyframePosition(-1, -1, 0, 0)
-						.addKeyframePosition(-1, -1, 0, 750)
-						.addKeyframePosition(-1, 0, 0, 500)
-						.addKeyframePosition(0, 0, 0, 3000)
-						.addKeyframePosition(0, 0, 0, 750)
+						.addPos(-1, -1, 0, 0)
+						.addPos(-1, -1, 0, 750)
+						.addPos(-1, 0, 0, 500)
+						.addPos(0, 0, 0, 3000)
+						.addPos(0, 0, 0, 750)
 						)
 				);
 		

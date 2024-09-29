@@ -26,6 +26,7 @@ import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
+@SuppressWarnings("unused") //shut the fuck up
 public class HazardRegistry {
 
 	//CO60		             5a		β−	030.00Rad/s	Spicy
@@ -215,7 +216,6 @@ public class HazardRegistry {
 		HazardSystem.register(ancient_scrap, makeData(RADIATION, 150F));
 		HazardSystem.register(block_corium, makeData(RADIATION, 150F));
 		HazardSystem.register(block_corium_cobble, makeData(RADIATION, 150F));
-		HazardSystem.register(sand_gold198, makeData(RADIATION, au198 * block * powder_mult));
 		
 		HazardSystem.register(new ItemStack(ModBlocks.sellafield, 1, 0), makeData(RADIATION, 0.5F));
 		HazardSystem.register(new ItemStack(ModBlocks.sellafield, 1, 1), makeData(RADIATION, 1F));
@@ -259,15 +259,6 @@ public class HazardRegistry {
 		registerOtherWaste(waste_u235, wst * billet * 11F);
 		registerOtherWaste(waste_schrabidium, wst * billet * 15F);
 		registerOtherWaste(waste_zfb_mox, wst * billet * 5F);
-		
-		registerOtherFuel(pellet_schrabidium, sa326 * ingot * 5, wst * ingot * 100, true);
-		registerOtherFuel(pellet_hes, saf * ingot * 5, wst * ingot * 75, true);
-		registerOtherFuel(pellet_mes, saf * ingot * 5, wst * ingot * 50, true);
-		registerOtherFuel(pellet_les, saf * ingot * 5, wst * ingot * 20, false);
-		registerOtherFuel(pellet_beryllium, 0F, 10F, false);
-		registerOtherFuel(pellet_neptunium, np237 * ingot * 5, wst * ingot * 10, false);
-		registerOtherFuel(pellet_lead, 0F, 15F, false);
-		registerOtherFuel(pellet_advanced, 0F, 20F, false);
 		
 		registerOtherFuel(plate_fuel_u233, u233 * ingot, wst * ingot * 13F, false);
 		registerOtherFuel(plate_fuel_u235, u235 * ingot, wst * ingot * 10F, false);
@@ -469,8 +460,6 @@ public class HazardRegistry {
 		HazardSystem.register(ModBlocks.fallout, makeData(RADIATION, fo * powder * 2));
 		HazardSystem.register(ModBlocks.block_fallout, makeData(RADIATION, yc * block * powder_mult));
 		HazardSystem.register(powder_caesium, makeData().addEntry(HYDROACTIVE, 1F).addEntry(HOT, 3F));
-		
-		HazardSystem.register(wire_schrabidium, makeData(RADIATION, sa326 * nugget));
 		
 		HazardSystem.register(brick_asbestos, makeData(ASBESTOS, 1F));
 		HazardSystem.register(tile_lab_broken, makeData(ASBESTOS, 1F));

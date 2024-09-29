@@ -2,6 +2,7 @@ package com.hbm.main;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
@@ -13,10 +14,6 @@ import org.lwjgl.opengl.GL11;
 import com.hbm.blocks.ILookOverlay;
 import com.hbm.blocks.ModBlocks;
 import com.hbm.blocks.generic.BlockAshes;
-import com.hbm.blocks.rail.IRailNTM;
-import com.hbm.blocks.rail.IRailNTM.MoveContext;
-import com.hbm.blocks.rail.IRailNTM.RailCheckType;
-import com.hbm.blocks.rail.IRailNTM.RailContext;
 import com.hbm.config.GeneralConfig;
 import com.hbm.entity.mob.EntityHunterChopper;
 import com.hbm.entity.projectile.EntityChopperMine;
@@ -27,6 +24,7 @@ import com.hbm.handler.ArmorModHandler;
 import com.hbm.handler.GunConfiguration;
 import com.hbm.handler.HTTPHandler;
 import com.hbm.handler.HazmatRegistry;
+import com.hbm.handler.HbmKeybinds;
 import com.hbm.handler.ImpactWorldHandler;
 import com.hbm.hazard.HazardSystem;
 import com.hbm.interfaces.IHoldableWeapon;
@@ -35,20 +33,23 @@ import com.hbm.interfaces.Spaghetti;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.inventory.gui.GUIArmorTable;
 import com.hbm.inventory.gui.GUIScreenPreview;
-import com.hbm.items.ISyncButtons;
+import com.hbm.inventory.gui.GUIScreenWikiRender;
 import com.hbm.items.ModItems;
 import com.hbm.items.armor.ArmorFSB;
 import com.hbm.items.armor.ArmorFSBPowered;
 import com.hbm.items.armor.ArmorNo9;
 import com.hbm.items.armor.ItemArmorMod;
 import com.hbm.items.armor.JetpackBase;
+import com.hbm.items.machine.ItemDepletedFuel;
+import com.hbm.items.machine.ItemFluidDuct;
+import com.hbm.items.machine.ItemRBMKPellet;
 import com.hbm.items.weapon.ItemGunBase;
+import com.hbm.items.weapon.sedna.ItemGunBaseNT;
 import com.hbm.lib.Library;
 import com.hbm.lib.RefStrings;
-import com.hbm.packet.AuxButtonPacket;
-import com.hbm.packet.GunButtonPacket;
 import com.hbm.packet.PacketDispatcher;
-import com.hbm.packet.SyncButtonsPacket;
+import com.hbm.packet.toserver.AuxButtonPacket;
+import com.hbm.packet.toserver.GunButtonPacket;
 import com.hbm.render.anim.HbmAnimations;
 import com.hbm.render.anim.HbmAnimations.Animation;
 import com.hbm.render.block.ct.CTStitchReceiver;
@@ -62,7 +63,6 @@ import com.hbm.sound.MovingSoundChopper;
 import com.hbm.sound.MovingSoundChopperMine;
 import com.hbm.sound.MovingSoundCrashing;
 import com.hbm.sound.MovingSoundPlayerLoop;
-import com.hbm.sound.MovingSoundXVL1456;
 import com.hbm.tileentity.bomb.TileEntityNukeCustom;
 import com.hbm.tileentity.bomb.TileEntityNukeCustom.CustomNukeEntry;
 import com.hbm.tileentity.bomb.TileEntityNukeCustom.EnumEntryType;
@@ -70,7 +70,7 @@ import com.hbm.tileentity.machine.TileEntityNukeFurnace;
 import com.hbm.util.I18nUtil;
 import com.hbm.util.ItemStackUtil;
 import com.hbm.util.LoggingUtil;
-import com.hbm.util.fauxpointtwelve.BlockPos;
+import com.hbm.util.ShadyUtil;
 import com.hbm.wiaj.GuiWorldInAJar;
 import com.hbm.wiaj.cannery.CanneryBase;
 import com.hbm.wiaj.cannery.Jars;
@@ -79,17 +79,14 @@ import com.hbm.util.ArmorUtil;
 import com.hbm.util.ArmorRegistry.HazardClass;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture.Type;
 
-import api.hbm.item.IButtonReceiver;
-import api.hbm.item.IClickReceiver;
-
 import com.hbm.sound.MovingSoundPlayerLoop.EnumHbmSound;
 
 import cpw.mods.fml.client.FMLClientHandler;
 import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.InputEvent;
-import cpw.mods.fml.common.gameevent.InputEvent.KeyInputEvent;
 import cpw.mods.fml.common.gameevent.TickEvent.ClientTickEvent;
 import cpw.mods.fml.common.gameevent.TickEvent.Phase;
 import cpw.mods.fml.common.gameevent.TickEvent.WorldTickEvent;
@@ -112,6 +109,7 @@ import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
+import net.minecraft.init.Blocks;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemArmor;
@@ -149,6 +147,8 @@ public class ModEventHandlerClient {
 	
 	public static final int flashDuration = 5_000;
 	public static long flashTimestamp;
+	public static final int shakeDuration = 1_500;
+	public static long shakeTimestamp;
 	
 	@SubscribeEvent
 	public void onOverlayRender(RenderGameOverlayEvent.Pre event) {
@@ -167,7 +167,7 @@ public class ModEventHandlerClient {
 			GL11.glDepthMask(false);
 			tess.startDrawingQuads();
 			float brightness = (flashTimestamp + flashDuration - System.currentTimeMillis()) / (float) flashDuration;
-			tess.setColorRGBA_F(1F, 1F, 1F, brightness * 0.8F);
+			tess.setColorRGBA_F(1F, 1F, 1F, brightness * 1F);
 			tess.addVertex(width, 0, 0);
 			tess.addVertex(0, 0, 0);
 			tess.addVertex(0, height, 0);
@@ -215,6 +215,11 @@ public class ModEventHandlerClient {
 					} else if(world.getBlock(mop.blockX, mop.blockY, mop.blockZ) instanceof ILookOverlay) {
 						((ILookOverlay) world.getBlock(mop.blockX, mop.blockY, mop.blockZ)).printHook(event, world, mop.blockX, mop.blockY, mop.blockZ);
 					}
+					
+					/*List<String> text = new ArrayList();
+					text.add("Meta: " + world.getBlockMetadata(mop.blockX, mop.blockY, mop.blockZ));
+					ILookOverlay.printGeneric(event, "DEBUG", 0xffff00, 0x4040000, text);*/
+					
 				} else if(mop.typeOfHit == mop.typeOfHit.ENTITY) {
 					Entity entity = mop.entityHit;
 					
@@ -364,24 +369,31 @@ public class ModEventHandlerClient {
 		}
 	}
 	
-	@SubscribeEvent
-	public void onOverlayRender(RenderGameOverlayEvent.Post event) {
+	@SubscribeEvent(receiveCanceled = true)
+	public void onHUDRenderShield(RenderGameOverlayEvent.Pre event) {
+
+		EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+		
+		if(event.type == event.type.ARMOR) {
+
+			HbmPlayerProps props = HbmPlayerProps.getData(player);
+			if(props.getEffectiveMaxShield() > 0) {
+				RenderScreenOverlay.renderShieldBar(event.resolution, Minecraft.getMinecraft().ingameGUI);
+			}
+		}
+	}
+	
+	@SubscribeEvent(receiveCanceled = true, priority = EventPriority.LOW)
+	public void onHUDRenderBar(RenderGameOverlayEvent.Post event) {
 		
 		/// HANDLE ELECTRIC FSB HUD ///
 		
 		EntityPlayer player = Minecraft.getMinecraft().thePlayer;
 		Tessellator tess = Tessellator.instance;
 		
-		if(!event.isCanceled() && event.type == event.type.HEALTH) {
-			HbmPlayerProps props = HbmPlayerProps.getData(player);
-			if(props.maxShield > 0) {
-				RenderScreenOverlay.renderShieldBar(event.resolution, Minecraft.getMinecraft().ingameGUI);
-			}
-		}
-		
-		if(!event.isCanceled() && event.type == event.type.ARMOR) {
+		if(event.type == event.type.ARMOR) {
 			
-			if(ForgeHooks.getTotalArmorValue(player) == 0/* && GuiIngameForge.left_height == 59*/) {
+			if(ForgeHooks.getTotalArmorValue(player) == 0) {
 				GuiIngameForge.left_height -= 10;
 			}
 
@@ -398,7 +410,7 @@ public class ModEventHandlerClient {
 
 				for(int i = 0; i < (noHelmet ? 3 : 4); i++) {
 					
-					int top = height - GuiIngameForge.left_height + 6;
+					int top = height - GuiIngameForge.left_height + 7;
 
 					ItemStack stack = player.inventory.armorInventory[i];
 
@@ -452,7 +464,6 @@ public class ModEventHandlerClient {
 				GL11.glEnable(GL11.GL_TEXTURE_2D);
 
 			}
-
 		}
 	}
 	
@@ -561,12 +572,10 @@ public class ModEventHandlerClient {
 		}
 		
 		if(player.getCurrentArmor(2) == null && !player.isPotionActive(Potion.invisibility)) {
-			if(player.getUniqueID().toString().equals(Library.SolsticeUnlimitd) || player.getDisplayName().equals("SolsticeUnlimitd"))
-				RenderAccessoryUtility.renderSol(event);
-			if(player.getUniqueID().toString().equals(Library.HbMinecraft) || player.getDisplayName().equals("HbMinecraft"))
-				RenderAccessoryUtility.renderWings(event, 2);
-			if(player.getUniqueID().toString().equals(Library.the_NCR) || player.getDisplayName().equals("the_NCR"))
-				RenderAccessoryUtility.renderWings(event, 3);
+			if(player.getUniqueID().toString().equals(ShadyUtil.HbMinecraft) ||		player.getDisplayName().equals("HbMinecraft"))		RenderAccessoryUtility.renderWings(event, 2);
+			if(player.getUniqueID().toString().equals(ShadyUtil.the_NCR) ||			player.getDisplayName().equals("the_NCR"))			RenderAccessoryUtility.renderWings(event, 3);
+			if(player.getUniqueID().toString().equals(ShadyUtil.Barnaby99_x) ||		player.getDisplayName().equals("pheo7"))			RenderAccessoryUtility.renderAxePack(event);
+			if(player.getUniqueID().toString().equals(ShadyUtil.LePeeperSauvage) ||	player.getDisplayName().equals("LePeeperSauvage"))	RenderAccessoryUtility.renderFaggot(event);
 		}
 	}
 
@@ -578,15 +587,6 @@ public class ModEventHandlerClient {
 		if(player.getHeldItem() != null) {
 			
 			Item held = player.getHeldItem().getItem();
-			
-			if(held instanceof IClickReceiver) {
-				IClickReceiver rec = (IClickReceiver) held;
-				
-				if(rec.handleMouseInput(player.getHeldItem(), player, event.button, event.buttonstate)) {
-					event.setCanceled(true);
-					return;
-				}
-			}
 			
 			if(held instanceof ItemGunBase) {
 				
@@ -605,30 +605,6 @@ public class ModEventHandlerClient {
 					PacketDispatcher.wrapper.sendToServer(new GunButtonPacket(true, (byte) 1));
 					item.startActionClient(player.getHeldItem(), player.worldObj, player, false);
 				}
-			}
-			
-			if(held instanceof ISyncButtons) {
-				ISyncButtons rec = (ISyncButtons) held;
-				
-				if(rec.canReceiveMouse(player, player.getHeldItem(), event, event.button, event.buttonstate)) {
-					PacketDispatcher.wrapper.sendToServer(new SyncButtonsPacket(event.buttonstate, event.button));
-				}
-			}
-		}
-	}
-	
-	@SubscribeEvent
-	public void keyEvent(KeyInputEvent event) {
-		
-		EntityPlayer player = Minecraft.getMinecraft().thePlayer;
-		
-		if(player.getHeldItem() != null) {
-			
-			Item held = player.getHeldItem().getItem();
-			
-			if(held instanceof IButtonReceiver) {
-				IButtonReceiver rec = (IButtonReceiver) held;
-				rec.handleKeyboardInput(player.getHeldItem(), player);
 			}
 		}
 	}
@@ -660,19 +636,6 @@ public class ModEventHandlerClient {
 		//A winner is you.
 		//Conglaturations.
 		//Fuck you.
-
-		if(r.toString().equals("hbm:misc.nullTau") && Library.getClosestPlayerForSound(wc, e.sound.getXPosF(), e.sound.getYPosF(), e.sound.getZPosF(), 2) != null)
-		{
-			EntityPlayer ent = Library.getClosestPlayerForSound(wc, e.sound.getXPosF(), e.sound.getYPosF(), e.sound.getZPosF(), 2);
-			
-			if(MovingSoundPlayerLoop.getSoundByPlayer(ent, EnumHbmSound.soundTauLoop) == null) {
-				MovingSoundPlayerLoop.globalSoundList.add(new MovingSoundXVL1456(new ResourceLocation("hbm:weapon.tauChargeLoop2"), ent, EnumHbmSound.soundTauLoop));
-				MovingSoundPlayerLoop.getSoundByPlayer(ent, EnumHbmSound.soundTauLoop).setPitch(0.5F);
-			} else {
-				if(MovingSoundPlayerLoop.getSoundByPlayer(ent, EnumHbmSound.soundTauLoop).getPitch() < 1.5F)
-				MovingSoundPlayerLoop.getSoundByPlayer(ent, EnumHbmSound.soundTauLoop).setPitch(MovingSoundPlayerLoop.getSoundByPlayer(ent, EnumHbmSound.soundTauLoop).getPitch() + 0.01F);
-			}
-		}
 		
 		if(r.toString().equals("hbm:misc.nullChopper") && Library.getClosestChopperForSound(wc, e.sound.getXPosF(), e.sound.getYPosF(), e.sound.getZPosF(), 2) != null)
 		{
@@ -811,6 +774,8 @@ public class ModEventHandlerClient {
 			CanneryBase cannery = Jars.canneries.get(comp);
 			if(cannery != null) {
 				list.add(EnumChatFormatting.GREEN + I18nUtil.resolveKey("cannery.f1"));
+				lastCannery = comp;
+				canneryTimestamp = System.currentTimeMillis();
 			}
 		} catch(Exception ex) {
 			list.add(EnumChatFormatting.RED + "Error loading cannery: " + ex.getLocalizedMessage());
@@ -825,6 +790,9 @@ public class ModEventHandlerClient {
 			}
 		}*/
 	}
+	
+	private static long canneryTimestamp;
+	private static ComparableStack lastCannery = null;
 	
 	private ResourceLocation ashes = new ResourceLocation(RefStrings.MODID + ":textures/misc/overlay_ash.png");
 	
@@ -898,20 +866,24 @@ public class ModEventHandlerClient {
 
 	public static int currentBrightness = 0;
 	public static int lastBrightness = 0;
+
+	static boolean isRenderingItems = false;
 	
 	@SubscribeEvent
-	public void clentTick(ClientTickEvent event) {
+	public void clientTick(ClientTickEvent event) {
 		
 		Minecraft mc = Minecraft.getMinecraft();
 		ArmorNo9.updateWorldHook(mc.theWorld);
+
+		boolean supportsHighRenderDistance = FMLClientHandler.instance().hasOptifine() || Loader.isModLoaded("angelica");
 		
-		if(mc.gameSettings.renderDistanceChunks > 16 && GeneralConfig.enableRenderDistCheck && ! FMLClientHandler.instance().hasOptifine()) {
+		if(mc.gameSettings.renderDistanceChunks > 16 && GeneralConfig.enableRenderDistCheck && !supportsHighRenderDistance) {
 			mc.gameSettings.renderDistanceChunks = 16;
 			LoggingUtil.errorWithHighlight("========================== WARNING ==========================");
-			LoggingUtil.errorWithHighlight("Dangerous render distance detected: Values over 16 only work on 1.8+ or with Optifine installed!!");
+			LoggingUtil.errorWithHighlight("Dangerous render distance detected: Values over 16 only work on 1.8+ or with Optifine/Angelica installed!!");
 			LoggingUtil.errorWithHighlight("Set '1.25_enableRenderDistCheck' in hbm.cfg to 'false' to disable this check.");
 			LoggingUtil.errorWithHighlight("========================== WARNING ==========================");
-			LoggingUtil.errorWithHighlight("If you got this error after removing Optifine: Consider deleting your option files after removing mods.");
+			LoggingUtil.errorWithHighlight("If you got this error after removing Optifine/Angelica: Consider deleting your option files after removing mods.");
 			LoggingUtil.errorWithHighlight("If you got this error after downgrading your Minecraft version: Consider using a launcher that doesn't reuse the same folders for every game instance. MultiMC for example, it's really good and it comes with a dedicated cat button. You like cats, right? Are you using the Microsoft launcher? The one launcher that turns every version switch into a tightrope act because all the old config and options files are still here because different instances all use the same folder structure instead of different folders like a competent launcher would, because some MO-RON thought that this was an acceptable way of doing things? Really? The launcher that circumcises every crashlog into indecipherable garbage, tricking oblivious people into posting that as a \"crash report\", effectively wasting everyone's time? The launcher made by the company that thought it would be HI-LA-RI-OUS to force everyone to use Microsoft accounts, effectively breaking every other launcher until they implement their terrible auth system?");
 			LoggingUtil.errorWithHighlight("========================== WARNING ==========================");
 		}
@@ -937,9 +909,14 @@ public class ModEventHandlerClient {
 		
 		if(Keyboard.isKeyDown(Keyboard.KEY_F1)) {
 			
-			ItemStack stack = getMouseOverStack();
-			if(stack != null) {
-				ComparableStack comp = new ComparableStack(stack).makeSingular();
+			ComparableStack comp = canneryTimestamp > System.currentTimeMillis() - 100 ? lastCannery : null;
+			
+			if(comp == null) {
+				ItemStack stack = getMouseOverStack();
+				if(stack != null) comp = new ComparableStack(stack).makeSingular();
+			}
+			
+			if(comp != null) {
 				CanneryBase cannery = Jars.canneries.get(comp);
 				if(cannery != null) {
 					FMLCommonHandler.instance().showGuiScreen(new GuiWorldInAJar(cannery.createScript(), cannery.getName(), cannery.getIcon(), cannery.seeAlso()));
@@ -956,9 +933,49 @@ public class ModEventHandlerClient {
 				FMLCommonHandler.instance().showGuiScreen(new GUIScreenPreview(stack));
 			}
 		}
+
+		if(Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) && Keyboard.isKeyDown(Keyboard.KEY_0) && Keyboard.isKeyDown(Keyboard.KEY_1)) {
+			if (!isRenderingItems) {
+				isRenderingItems = true;
+
+				MainRegistry.logger.info("Taking a screenshot of ALL items, if you did this by mistake: fucking lmao get rekt nerd");
+
+				List<Item> ignoredItems = Arrays.asList(
+					ModItems.assembly_template,
+					ModItems.crucible_template,
+					ModItems.chemistry_template,
+					ModItems.chemistry_icon,
+					ModItems.achievement_icon,
+					Items.spawn_egg,
+					Item.getItemFromBlock(Blocks.mob_spawner)
+				);
+
+				List<Class<? extends Item>> collapsedClasses = Arrays.asList(
+					ItemRBMKPellet.class,
+					ItemDepletedFuel.class,
+					ItemFluidDuct.class
+				);
+
+				List<ItemStack> stacks = new ArrayList<ItemStack>();
+				for (Object reg : Item.itemRegistry) {
+					Item item = (Item) reg;
+					if(ignoredItems.contains(item)) continue;
+					if(collapsedClasses.contains(item.getClass())) {
+						stacks.add(new ItemStack(item));
+					} else {
+						item.getSubItems(item, null, stacks);
+					}
+				}
+
+				FMLCommonHandler.instance().showGuiScreen(new GUIScreenWikiRender(stacks.toArray(new ItemStack[0]), "Block ", "wiki-block-renders-256", 8));
+			}
+		} else {
+			isRenderingItems = false;
+		}
+
+		EntityPlayer player = mc.thePlayer;
 		
 		if(event.phase == Phase.START) {
-			EntityPlayer player = mc.thePlayer;
 			
 			float discriminator = 0.003F;
 			float defaultStepSize = 0.5F;
@@ -974,6 +991,26 @@ public class ModEventHandlerClient {
 			} else {
 				for(int i = 1; i < 4; i++) if(player.stepHeight == i + discriminator) player.stepHeight = defaultStepSize;
 			}
+		}
+		
+		if(event.phase == Phase.END) {
+			
+			ItemGunBaseNT.offsetVertical += ItemGunBaseNT.recoilVertical;
+			ItemGunBaseNT.offsetHorizontal += ItemGunBaseNT.recoilHorizontal;
+			player.rotationPitch -= ItemGunBaseNT.recoilVertical;
+			player.rotationYaw -= ItemGunBaseNT.recoilHorizontal;
+
+			float decay = 0.75F;
+			float rebound = 0.25F;
+			ItemGunBaseNT.recoilVertical *= decay;
+			ItemGunBaseNT.recoilHorizontal *= decay;
+			float dV = ItemGunBaseNT.offsetVertical * rebound;
+			float dH = ItemGunBaseNT.offsetHorizontal * rebound;
+			
+			ItemGunBaseNT.offsetVertical -= dV;
+			ItemGunBaseNT.offsetHorizontal -= dH;
+			player.rotationPitch += dV;
+			player.rotationYaw += dH;
 		}
 	}
 	
@@ -1042,9 +1079,9 @@ public class ModEventHandlerClient {
 	}
 
 	@SideOnly(Side.CLIENT)
-	@SubscribeEvent
-	public void onMouseClicked(InputEvent.KeyInputEvent event) {
-
+	@SubscribeEvent(priority = EventPriority.LOW)
+	public void onMouseClicked(InputEvent.MouseInputEvent event) {
+		
 		Minecraft mc = Minecraft.getMinecraft();
 		if(GeneralConfig.enableKeybindOverlap && (mc.currentScreen == null || mc.currentScreen.allowUserInput)) {
 			boolean state = Mouse.getEventButtonState();
@@ -1055,18 +1092,37 @@ public class ModEventHandlerClient {
 				KeyBinding key = (KeyBinding) o;
 				
 				if(key.getKeyCode() == keyCode && KeyBinding.hash.lookup(key.getKeyCode()) != key) {
-					
+
 					key.pressed = state;
-					if(state) {
-						key.pressTime++;
+					if(state && key.pressTime == 0) {
+						key.pressTime = 1;
 					}
+				}
+			}
+			
+			boolean gunKey = keyCode == HbmKeybinds.gunPrimaryKey.getKeyCode() || keyCode == HbmKeybinds.gunSecondaryKey.getKeyCode() ||
+					keyCode == HbmKeybinds.gunTertiaryKey.getKeyCode() || keyCode == HbmKeybinds.reloadKey.getKeyCode();
+			
+			EntityPlayer player = mc.thePlayer;
+			
+			if(player.getHeldItem() != null && player.getHeldItem().getItem() instanceof ItemGunBaseNT) {
+				
+				/* Shoot in favor of attacking */
+				if(gunKey && keyCode == mc.gameSettings.keyBindAttack.getKeyCode()) {
+					mc.gameSettings.keyBindAttack.pressed = false;
+					mc.gameSettings.keyBindAttack.pressTime = 0;
+				}
+				
+				if(gunKey && keyCode == mc.gameSettings.keyBindPickBlock.getKeyCode()) {
+					mc.gameSettings.keyBindPickBlock.pressed = false;
+					mc.gameSettings.keyBindPickBlock.pressTime = 0;
 				}
 			}
 		}
 	}
 
 	@SideOnly(Side.CLIENT)
-	@SubscribeEvent
+	@SubscribeEvent(priority = EventPriority.LOW)
 	public void onKeyTyped(InputEvent.KeyInputEvent event) {
 
 		Minecraft mc = Minecraft.getMinecraft();
@@ -1081,8 +1137,8 @@ public class ModEventHandlerClient {
 				if(keyCode != 0 && key.getKeyCode() == keyCode && KeyBinding.hash.lookup(key.getKeyCode()) != key) {
 					
 					key.pressed = state;
-					if(state) {
-						key.pressTime++;
+					if(state && key.pressTime == 0) {
+						key.pressTime = 1;
 					}
 				}
 			}
@@ -1240,6 +1296,7 @@ public class ModEventHandlerClient {
 
 	public static IIcon particleBase;
 	public static IIcon particleLeaf;
+	public static IIcon particleSplash;
 
 	@SubscribeEvent
 	public void onTextureStitch(TextureStitchEvent.Pre event) {
@@ -1247,6 +1304,7 @@ public class ModEventHandlerClient {
 		if(event.map.getTextureType() == 0) {
 			particleBase = event.map.registerIcon(RefStrings.MODID + ":particle/particle_base");
 			particleLeaf = event.map.registerIcon(RefStrings.MODID + ":particle/dead_leaf");
+			particleSplash = event.map.registerIcon(RefStrings.MODID + ":particle/particle_splash");
 		}
 	}
 

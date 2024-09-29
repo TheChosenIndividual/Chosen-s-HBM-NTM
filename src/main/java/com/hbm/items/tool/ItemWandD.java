@@ -2,13 +2,14 @@ package com.hbm.items.tool;
 
 import java.util.List;
 
-import com.hbm.entity.effect.EntityNukeTorex;
+import com.hbm.explosion.vanillant.ExplosionVNT;
+import com.hbm.explosion.vanillant.standard.BlockAllocatorStandard;
 import com.hbm.lib.Library;
+import com.hbm.particle.helper.ExplosionCreator;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.world.World;
 
@@ -42,6 +43,23 @@ public class ItemWandD extends Item {
 			Component comp = new RuralHouse1(world.rand, i, j);
 			comp.addComponentParts(world, world.rand, new StructureBoundingBox(i, j, i + 32, j + 32));*/
 			
+			ExplosionVNT vnt = new ExplosionVNT(world, pos.blockX + 0.5, pos.blockY + 1, pos.blockZ + 0.5, 15F);
+			vnt.makeStandard();
+			vnt.setSFX();
+			vnt.setBlockAllocator(new BlockAllocatorStandard(32));
+			vnt.explode();
+			
+			ExplosionCreator.composeEffectStandard(world, pos.blockX + 0.5, pos.blockY + 0.5, pos.blockZ + 0.5);
+			
+			/*for(int i = 0; i < 10; i++) {
+				NBTTagCompound data = new NBTTagCompound();
+				data.setString("type", "debris");
+				PacketDispatcher.wrapper.sendToAllAround(new AuxParticlePacketNT(data, pos.blockX + world.rand.nextGaussian() * 3, pos.blockY - 2, pos.blockZ + world.rand.nextGaussian() * 3), new TargetPoint(world.provider.dimensionId, pos.blockX, pos.blockY, pos.blockZ, 100));
+			}
+			NBTTagCompound data = new NBTTagCompound();
+			data.setString("type", "oomph");
+			PacketDispatcher.wrapper.sendToAllAround(new AuxParticlePacketNT(data, pos.blockX, pos.blockY, pos.blockZ), new TargetPoint(world.provider.dimensionId, pos.blockX, pos.blockY, pos.blockZ, 100));*/
+			
 			/*TimeAnalyzer.startCount("setBlock");
 			world.setBlock(pos.blockX, pos.blockY, pos.blockZ, Blocks.dirt);
 			TimeAnalyzer.startEndCount("getBlock");
@@ -70,13 +88,13 @@ public class ItemWandD extends Item {
 			tom.destructionRange = 600;
 			world.spawnEntityInWorld(tom);*/
 			
-			List<EntityNukeTorex> del = world.getEntitiesWithinAABB(EntityNukeTorex.class, AxisAlignedBB.getBoundingBox(pos.blockX, pos.blockY + 1, pos.blockZ, pos.blockX, pos.blockY + 1, pos.blockZ).expand(50, 50, 50));
+			/*List<EntityNukeTorex> del = world.getEntitiesWithinAABB(EntityNukeTorex.class, AxisAlignedBB.getBoundingBox(pos.blockX, pos.blockY + 1, pos.blockZ, pos.blockX, pos.blockY + 1, pos.blockZ).expand(50, 50, 50));
 			
 			if(!del.isEmpty()) {
 				for(EntityNukeTorex torex : del) torex.setDead();
 			} else {
 				EntityNukeTorex.statFac(world, pos.blockX, pos.blockY + 1, pos.blockZ, 150);
-			}
+			}*/
 			
 			/*EntityTracker entitytracker = ((WorldServer) world).getEntityTracker();
 			IntHashMap map = ReflectionHelper.getPrivateValue(EntityTracker.class, entitytracker, "trackedEntityIDs", "field_72794_c");

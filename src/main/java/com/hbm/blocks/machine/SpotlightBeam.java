@@ -2,29 +2,15 @@ package com.hbm.blocks.machine;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import com.hbm.tileentity.TileEntityData;
 
 import net.minecraft.block.Block;
-import net.minecraft.block.BlockContainer;
-import net.minecraft.block.material.Material;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.AxisAlignedBB;
-import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class SpotlightBeam extends BlockContainer {
-
-	public SpotlightBeam() {
-		super(Material.air);
-		setLightLevel(1.0F);
-		setLightOpacity(0);
-		setHardness(-1);
-		setResistance(1_000_000);
-		setBlockBounds(0, 0, 0, 0, 0, 0);
-	}
+public class SpotlightBeam extends BlockBeamBase {
 
 	// If a block is placed onto the beam, handle the new cutoff
 	@Override
@@ -35,8 +21,7 @@ public class SpotlightBeam extends BlockContainer {
 			}
 		}
 		super.breakBlock(world, x, y, z, block, metadata);
-
-    }
+	}
 
 	// If a block in the beam path is removed, repropagate beam
 	@Override
@@ -55,6 +40,7 @@ public class SpotlightBeam extends BlockContainer {
 	// 111111 -> ALL directions illuminated, all incoming lights need to be disabled to turn off the beam
 	public static List<ForgeDirection> getDirections(World world, int x, int y, int z) {
 		TileEntityData te = (TileEntityData) world.getTileEntity(x, y, z);
+		if(te == null) return new ArrayList<ForgeDirection>();
 		return getDirections(te.metadata);
 	}
 
@@ -69,6 +55,7 @@ public class SpotlightBeam extends BlockContainer {
 	// Returns the final metadata, so the caller can optionally remove the block
 	public static int setDirection(World world, int x, int y, int z, ForgeDirection dir, boolean state) {
 		TileEntityData te = (TileEntityData) world.getTileEntity(x, y, z);
+		if (te == null) return 0; // This shouldn't happen, and if it does, cancel propagation
 		int transformedMetadata = applyDirection(te.metadata, dir, state);
 		te.metadata = transformedMetadata;
 		return transformedMetadata;
@@ -76,7 +63,7 @@ public class SpotlightBeam extends BlockContainer {
 
 	// Sets the metadata bit for a given direction
 	public static int applyDirection(int metadata, ForgeDirection direction, boolean state) {
-		if (state) {
+		if(state) {
 			return metadata | direction.flag;
 		} else {
 			return metadata & ~direction.flag;
@@ -86,48 +73,5 @@ public class SpotlightBeam extends BlockContainer {
 	@Override
 	public TileEntity createNewTileEntity(World world, int meta) {
 		return new TileEntityData();
-	}
-
-	@Override
-	public boolean isOpaqueCube() {
-		return false;
-	}
-	
-	@Override
-	public boolean isAir(IBlockAccess world, int x, int y, int z)  {
-		return true;
-	}
-	
-	@Override
-	public boolean canBeReplacedByLeaves(IBlockAccess world, int x, int y, int z) {
-		return true;
-	}
-	
-	@Override
-	public boolean isLeaves(IBlockAccess world, int x, int y, int z) {
-		// This was taken from GregsLighting (cargo cult behaviour)
-		// This is a bit screwy, but it's needed so that trees are not prevented from growing
-		// near a floodlight beam.
-		return true;
-	}
-
-	@Override
-	public boolean renderAsNormalBlock() {
-		return false;
-	}
-	
-	@Override
-	public int quantityDropped(Random par1Random) {
-		return 0;
-	}
-
-	@Override
-	public AxisAlignedBB getCollisionBoundingBoxFromPool(World par1World, int par2, int par3, int par4) {
-		return null;
-	}
-
-	@Override
-	public int getRenderType() {
-		return -1;
 	}
 }

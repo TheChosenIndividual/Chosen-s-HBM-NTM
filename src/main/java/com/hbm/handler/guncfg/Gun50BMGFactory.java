@@ -9,21 +9,20 @@ import com.hbm.handler.CasingEjector;
 import com.hbm.handler.GunConfiguration;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.items.ModItems;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.items.ItemAmmoEnums.Ammo50BMG;
 import com.hbm.items.ItemAmmoEnums.AmmoLunaticSniper;
 import com.hbm.lib.HbmCollection;
 import com.hbm.lib.RefStrings;
 import com.hbm.lib.HbmCollection.EnumGunManufacturer;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 import com.hbm.particle.SpentCasing;
 import com.hbm.particle.SpentCasing.CasingType;
 import com.hbm.potion.HbmPotion;
 import com.hbm.render.anim.BusAnimation;
-import com.hbm.render.anim.BusAnimationKeyframe;
 import com.hbm.render.anim.BusAnimationSequence;
 import com.hbm.render.anim.HbmAnimations.AnimType;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
 import com.hbm.util.ContaminationUtil;
 import com.hbm.util.ContaminationUtil.ContaminationType;
 import com.hbm.util.ContaminationUtil.HazardType;
@@ -138,20 +137,20 @@ public class Gun50BMGFactory {
 
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("RECOIL", new BusAnimationSequence()
-						.addKeyframePosition(1, 0, 0, 25)
-						.addKeyframePosition(0, 0, 0, 75)
+						.addPos(1, 0, 0, 25)
+						.addPos(0, 0, 0, 75)
 				)
 		);
 		config.animations.put(AnimType.RELOAD, new BusAnimation()
 				.addBus("TILT", new BusAnimationSequence()
-						.addKeyframePosition(1, 0, 0, 125)
-						.addKeyframePosition(1, 0, 0, 750)
-						.addKeyframePosition(0, 0, 0, 125)
+						.addPos(1, 0, 0, 125)
+						.addPos(1, 0, 0, 750)
+						.addPos(0, 0, 0, 125)
 				)
 				.addBus("MAG", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 1, 200)
-						.addKeyframePosition(1, 0, 1, 200)
-						.addKeyframePosition(0, 0, 0, 200)
+						.addPos(0, 0, 1, 200)
+						.addPos(1, 0, 1, 200)
+						.addPos(0, 0, 0, 200)
 				)
 		);
 
@@ -191,8 +190,8 @@ public class Gun50BMGFactory {
 		
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("RECOIL", new BusAnimationSequence()
-						.addKeyframePosition(1, 0, 0, 25)
-						.addKeyframePosition(0, 0, 0, 75)
+						.addPos(1, 0, 0, 25)
+						.addPos(0, 0, 0, 75)
 						)
 				);
 		
@@ -238,10 +237,10 @@ public class Gun50BMGFactory {
 		config.animations.put(AnimType.CYCLE,
 				new BusAnimation()
 						.addBus("RECOIL", new BusAnimationSequence()
-								.addKeyframePosition(-0.45, 0.15, 0, 40) // Moves back  and raise slightly
-								.addKeyframePosition(0, 0, 0, 75)) // Then forward  again
-						.addBus("EJECT", new BusAnimationSequence().addKeyframePosition(0, 0, 0, 30) // Wait
-								.addKeyframePosition(50, 0, 0, 120))); // Fly // out
+								.addPos(-0.45, 0.15, 0, 40) // Moves back  and raise slightly
+								.addPos(0, 0, 0, 75)) // Then forward  again
+						.addBus("EJECT", new BusAnimationSequence().addPos(0, 0, 0, 30) // Wait
+								.addPos(50, 0, 0, 120))); // Fly // out
 
 		config.ejector = EJECTOR_SNIPER;
 		return config;

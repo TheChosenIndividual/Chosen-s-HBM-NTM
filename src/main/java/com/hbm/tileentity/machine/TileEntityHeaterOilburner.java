@@ -1,15 +1,14 @@
 package com.hbm.tileentity.machine;
 
-import com.hbm.handler.pollution.PollutionHandler;
-import com.hbm.handler.pollution.PollutionHandler.PollutionType;
 import com.hbm.interfaces.IControlReceiver;
 import com.hbm.inventory.container.ContainerOilburner;
 import com.hbm.inventory.fluid.Fluids;
 import com.hbm.inventory.fluid.tank.FluidTank;
 import com.hbm.inventory.fluid.trait.FT_Flammable;
-import com.hbm.inventory.fluid.trait.FluidTraitSimple.FT_Leaded;
+import com.hbm.inventory.fluid.trait.FluidTrait.FluidReleaseType;
 import com.hbm.inventory.gui.GUIOilburner;
 import com.hbm.lib.Library;
+import com.hbm.tileentity.IFluidCopiable;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.TileEntityMachinePolluting;
 import com.hbm.util.fauxpointtwelve.DirPos;
@@ -18,14 +17,14 @@ import api.hbm.fluid.IFluidStandardTransceiver;
 import api.hbm.tile.IHeatSource;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.world.World;
 
-public class TileEntityHeaterOilburner extends TileEntityMachinePolluting implements IGUIProvider, IFluidStandardTransceiver, IHeatSource, IControlReceiver {
+public class TileEntityHeaterOilburner extends TileEntityMachinePolluting implements IGUIProvider, IFluidStandardTransceiver, IHeatSource, IControlReceiver, IFluidCopiable {
 	
 	public boolean isOn = false;
 	public FluidTank tank;
@@ -82,9 +81,8 @@ public class TileEntityHeaterOilburner extends TileEntityMachinePolluting implem
 					
 					this.heatEnergy += heat * toBurn;
 
-					if(worldObj.getTotalWorldTime() % 20 == 0 && toBurn > 0) {
-						this.pollute(PollutionType.SOOT, PollutionHandler.SOOT_PER_SECOND * burnRate * 0.5F);
-						if(tank.getTankType().hasTrait(FT_Leaded.class)) this.pollute(PollutionType.HEAVYMETAL, PollutionHandler.HEAVY_METAL_PER_SECOND * burnRate * 0.5F);
+					if(worldObj.getTotalWorldTime() % 5 == 0 && toBurn > 0) {
+						super.pollute(tank.getTankType(), FluidReleaseType.BURN, toBurn * 5);
 					}
 					
 					shouldCool = false;
@@ -97,23 +95,28 @@ public class TileEntityHeaterOilburner extends TileEntityMachinePolluting implem
 			if(shouldCool)
 				this.heatEnergy = Math.max(this.heatEnergy - Math.max(this.heatEnergy / 1000, 1), 0);
 			
-			NBTTagCompound data = new NBTTagCompound();
-			tank.writeToNBT(data, "tank");
-			data.setBoolean("isOn", isOn);
-			data.setInteger("h", heatEnergy);
-			data.setByte("s", (byte) this.setting);
-			this.networkPack(data, 25);
+			this.networkPackNT(25);
 		}
 	}
-
+	
 	@Override
-	public void networkUnpack(NBTTagCompound nbt) {
-		super.networkUnpack(nbt);
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		tank.serialize(buf);
 		
-		tank.readFromNBT(nbt, "tank");
-		isOn = nbt.getBoolean("isOn");
-		heatEnergy = nbt.getInteger("h");
-		setting = nbt.getByte("s");
+		buf.writeBoolean(isOn);
+		buf.writeInt(heatEnergy);
+		buf.writeByte((byte) this.setting);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		tank.deserialize(buf);
+		
+		isOn = buf.readBoolean();
+		heatEnergy = buf.readInt();
+		setting = buf.readByte();
 	}
 	
 	@Override
@@ -153,7 +156,7 @@ public class TileEntityHeaterOilburner extends TileEntityMachinePolluting implem
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIOilburner(player.inventory, this);
 	}
 
@@ -213,5 +216,22 @@ public class TileEntityHeaterOilburner extends TileEntityMachinePolluting implem
 	@Override
 	public FluidTank[] getSendingTanks() {
 		return this.getSmokeTanks();
+	}
+
+	@Override
+	public NBTTagCompound getSettings(World world, int x, int y, int z) {
+		NBTTagCompound tag = new NBTTagCompound();
+		tag.setIntArray("fluidID", new int[]{tank.getTankType().getID()});
+		tag.setInteger("burnRate", setting);
+		tag.setBoolean("isOn", isOn);
+		return tag;
+	}
+
+	@Override
+	public void pasteSettings(NBTTagCompound nbt, int index, World world, EntityPlayer player, int x, int y, int z) {
+		int id = nbt.getIntArray("fluidID")[index];
+		tank.setTankType(Fluids.fromID(id));
+		if(nbt.hasKey("isOn")) isOn = nbt.getBoolean("isOn");
+		if(nbt.hasKey("burnRate")) setting = nbt.getInteger("burnRate");
 	}
 }

@@ -1,11 +1,10 @@
 package com.hbm.items.weapon;
 
-import com.hbm.entity.particle.EntitySSmokeFX;
 import com.hbm.entity.projectile.EntityBulletBaseNT;
 import com.hbm.handler.BulletConfigSyncingUtil;
 import com.hbm.interfaces.IHoldableWeapon;
 import com.hbm.items.ModItems;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
+import com.hbm.items.weapon.sedna.Crosshair;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
@@ -65,20 +64,6 @@ public class GunFolly extends Item implements IHoldableWeapon {
 				if (!world.isRemote) {
 					EntityBulletBaseNT bullet = new EntityBulletBaseNT(world, BulletConfigSyncingUtil.TEST_CONFIG, player);
 					world.spawnEntityInWorld(bullet);
-					
-					for(int i = 0; i < 25; i++) {
-						EntitySSmokeFX flame = new EntitySSmokeFX(world);
-						
-						flame.motionX = player.getLookVec().xCoord;
-						flame.motionY = player.getLookVec().yCoord;
-						flame.motionZ = player.getLookVec().zCoord;
-						
-						flame.posX = player.posX + flame.motionX + world.rand.nextGaussian() * 0.35;
-						flame.posY = player.posY + flame.motionY + world.rand.nextGaussian() * 0.35 + player.eyeHeight;
-						flame.posZ = player.posZ + flame.motionZ + world.rand.nextGaussian() * 0.35;
-						
-						world.spawnEntityInWorld(flame);
-					}
 				}
 			}
 		}

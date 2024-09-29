@@ -9,8 +9,8 @@ import com.hbm.blocks.ModBlocks;
 import com.hbm.entity.projectile.EntityShrapnel;
 import com.hbm.explosion.ExplosionNT;
 import com.hbm.explosion.ExplosionNT.ExAttrib;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import cpw.mods.fml.relauncher.Side;
@@ -197,10 +197,6 @@ public class BlockVolcano extends BlockContainer implements ITooltipProvider, IB
 			default: return 10;
 			}
 		}
-		
-		/* TODO */
-		private boolean doesPyroclastic() { return false; }
-		private double getPyroclasticRange() { return 0D; }
 		
 		/** Causes two magma explosions, one from bedrock to the core and one from the core to 15 blocks above. */
 		private void blastMagmaChannel() {

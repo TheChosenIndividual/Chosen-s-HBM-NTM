@@ -3,10 +3,11 @@ package com.hbm.tileentity.machine.rbmk;
 import com.hbm.blocks.BlockDummyable;
 import com.hbm.blocks.machine.rbmk.RBMKBase;
 import com.hbm.extprop.HbmPlayerProps;
+import com.hbm.handler.CompatHandler;
 import com.hbm.handler.HbmKeybinds.EnumKeybind;
 import com.hbm.items.machine.ItemRBMKRod;
-import com.hbm.packet.NBTPacket;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.NBTPacket;
 import com.hbm.tileentity.INBTPacketReceiver;
 import cpw.mods.fml.common.Optional;
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
@@ -28,7 +29,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 import java.util.List;
 
 @Optional.InterfaceList({@Optional.Interface(iface = "li.cil.oc.api.network.SimpleComponent", modid = "OpenComputers")})
-public class TileEntityCraneConsole extends TileEntity implements INBTPacketReceiver, SimpleComponent {
+public class TileEntityCraneConsole extends TileEntity implements INBTPacketReceiver, SimpleComponent, CompatHandler.OCComponent {
 	
 	public int centerX;
 	public int centerY;
@@ -80,16 +81,18 @@ public class TileEntityCraneConsole extends TileEntity implements INBTPacketRece
 				goesDown = false;
 				
 				if(!worldObj.isRemote && this.canTargetInteract()) {
-					if(this.loadedItem != null) {
-						getColumnAtPos().load(this.loadedItem);
-						this.loadedItem = null;
-					} else {
-						IRBMKLoadable column = getColumnAtPos();
-						this.loadedItem = column.provideNext();
-						column.unload();
+					IRBMKLoadable column = getColumnAtPos();
+					if(column != null) { // canTargetInteract already assumes this, but there seems to be some freak race conditions that cause the column to be null anyway
+						if(this.loadedItem != null) {
+							column.load(this.loadedItem);
+							this.loadedItem = null;
+						} else {
+							this.loadedItem = column.provideNext();
+							column.unload();
+						}
+						
+						this.markDirty();
 					}
-					
-					this.markDirty();
 				}
 					
 			}
@@ -335,6 +338,7 @@ public class TileEntityCraneConsole extends TileEntity implements INBTPacketRece
 	
 	// do some opencomputer stuff
 	@Override
+	@Optional.Method(modid = "OpenComputers")
 	public String getComponentName() {
 		return "rbmk_crane";
 	}

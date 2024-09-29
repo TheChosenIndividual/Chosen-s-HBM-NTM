@@ -26,12 +26,12 @@ import com.hbm.util.Compat;
 import com.hbm.util.fauxpointtwelve.BlockPos;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyProviderMK2;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidStandardTransceiver;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.block.Block;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -40,7 +40,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityCustomMachine extends TileEntityMachinePolluting implements IFluidStandardTransceiver, IEnergyUser, IGUIProvider {
+public class TileEntityCustomMachine extends TileEntityMachinePolluting implements IFluidStandardTransceiver, IEnergyProviderMK2, IEnergyReceiverMK2, IGUIProvider {
 
 	public String machineType;
 	public MachineConfiguration config;
@@ -155,7 +155,7 @@ public class TileEntityCustomMachine extends TileEntityMachinePolluting implemen
 
 			for (DirPos pos : this.connectionPos) {
 				if (config.generatorMode && power > 0)
-					this.sendPower(worldObj, pos.getX(), pos.getY(), pos.getZ(), pos.getDir());
+					this.tryProvide(worldObj, pos.getX(), pos.getY(), pos.getZ(), pos.getDir());
 				for (FluidTank tank : this.outputTanks)
 					if (tank.getFill() > 0)
 						this.sendFluid(tank, worldObj, pos.getX(), pos.getY(), pos.getZ(), pos.getDir());
@@ -259,21 +259,17 @@ public class TileEntityCustomMachine extends TileEntityMachinePolluting implemen
 		return null;
 	}
 	public void pollution(CustomMachineRecipe recipe) {
-		if (recipe.pollutionMode) {
-			if (recipe.pollutionAmount > 0) {
-				this.pollute(PollutionHandler.PollutionType.valueOf(recipe.pollutionType), recipe.pollutionAmount);
-			} else if (recipe.pollutionAmount < 0 && PollutionHandler.getPollution(worldObj, xCoord, yCoord, zCoord, PollutionHandler.PollutionType.valueOf(recipe.pollutionType)) >= -recipe.pollutionAmount) {
-				PollutionHandler.decrementPollution(worldObj, xCoord, yCoord, zCoord, PollutionHandler.PollutionType.valueOf(recipe.pollutionType), -recipe.pollutionAmount);
-			}
+		if(recipe.pollutionAmount > 0) {
+			this.pollute(PollutionHandler.PollutionType.valueOf(recipe.pollutionType), recipe.pollutionAmount);
+		} else if(recipe.pollutionAmount < 0 && PollutionHandler.getPollution(worldObj, xCoord, yCoord, zCoord, PollutionHandler.PollutionType.valueOf(recipe.pollutionType)) >= -recipe.pollutionAmount) {
+			PollutionHandler.decrementPollution(worldObj, xCoord, yCoord, zCoord, PollutionHandler.PollutionType.valueOf(recipe.pollutionType), -recipe.pollutionAmount);
 		}
 	}
 	public void radiation(CustomMachineRecipe recipe){
-		if (recipe.radiationMode) {
-			if (recipe.radiationAmount > 0) {
-				ChunkRadiationManager.proxy.incrementRad(worldObj, xCoord, yCoord, zCoord, recipe.radiationAmount);
-			} else if (recipe.radiationAmount < 0) {
-				ChunkRadiationManager.proxy.decrementRad(worldObj, xCoord, yCoord, zCoord, -recipe.radiationAmount);
-			}
+		if(recipe.radiationAmount > 0) {
+			ChunkRadiationManager.proxy.incrementRad(worldObj, xCoord, yCoord, zCoord, recipe.radiationAmount);
+		} else if (recipe.radiationAmount < 0) {
+			ChunkRadiationManager.proxy.decrementRad(worldObj, xCoord, yCoord, zCoord, -recipe.radiationAmount);
 		}
 	}
 	protected void tryPullHeat(int x, int y, int z) {
@@ -442,7 +438,7 @@ public class TileEntityCustomMachine extends TileEntityMachinePolluting implemen
 		if(this.config.itemInCount > 2) return new int[] { 4, 5, 6, 16, 17, 18, 19, 20, 21 };
 		if(this.config.itemInCount > 1) return new int[] { 4, 5, 16, 17, 18, 19, 20, 21 };
 		if(this.config.itemInCount > 0) return new int[] { 4, 16, 17, 18, 19, 20, 21 };
-		return new int[] { };
+		return new int[] { 16, 17, 18, 19, 20, 21 };
 	}
 
 	@Override
@@ -561,7 +557,7 @@ public class TileEntityCustomMachine extends TileEntityMachinePolluting implemen
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		if(this.config == null) return null;
 		return new GUIMachineCustom(player.inventory, this);
 	}
@@ -596,11 +592,16 @@ public class TileEntityCustomMachine extends TileEntityMachinePolluting implemen
 
 		return 0;
 	}
-
+	
 	@Override
-	public long getTransferWeight() {
-		if(this.config != null && this.config.generatorMode) return 0;
-
-		return Math.max(getMaxPower() - getPower(), 0);
+	public long getReceiverSpeed() {
+		if(this.config != null && !this.config.generatorMode) return this.getMaxPower();
+		return 0;
+	}
+	
+	@Override
+	public long getProviderSpeed() {
+		if(this.config != null && this.config.generatorMode) return this.getMaxPower();
+		return 0;
 	}
 }

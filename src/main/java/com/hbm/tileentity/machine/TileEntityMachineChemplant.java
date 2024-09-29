@@ -1,16 +1,12 @@
 package com.hbm.tileentity.machine;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.hbm.blocks.BlockDummyable;
 import com.hbm.blocks.ModBlocks;
-import com.hbm.interfaces.IFluidAcceptor;
-import com.hbm.interfaces.IFluidSource;
 import com.hbm.inventory.RecipesCommon.AStack;
 import com.hbm.inventory.UpgradeManager;
 import com.hbm.inventory.container.ContainerMachineChemplant;
-import com.hbm.inventory.fluid.FluidType;
 import com.hbm.inventory.fluid.Fluids;
 import com.hbm.inventory.fluid.tank.FluidTank;
 import com.hbm.inventory.gui.GUIMachineChemplant;
@@ -29,11 +25,11 @@ import com.hbm.util.I18nUtil;
 import com.hbm.util.InventoryUtil;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidStandardTransceiver;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IInventory;
@@ -46,7 +42,7 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityMachineChemplant extends TileEntityMachineBase implements IEnergyUser, IFluidSource, IFluidAcceptor, IFluidStandardTransceiver, IGUIProvider, IUpgradeInfoProvider {
+public class TileEntityMachineChemplant extends TileEntityMachineBase implements IEnergyReceiverMK2, IFluidStandardTransceiver, IGUIProvider, IUpgradeInfoProvider {
 
 	public long power;
 	public static final long maxPower = 100000;
@@ -78,7 +74,7 @@ public class TileEntityMachineChemplant extends TileEntityMachineBase implements
 		
 		tanks = new FluidTank[4];
 		for(int i = 0; i < 4; i++) {
-			tanks[i] = new FluidTank(Fluids.NONE, 24_000, i);
+			tanks[i] = new FluidTank(Fluids.NONE, 24_000);
 		}
 	}
 
@@ -123,10 +119,6 @@ public class TileEntityMachineChemplant extends TileEntityMachineBase implements
 			loadItems();
 			unloadItems();
 			
-			if(worldObj.getTotalWorldTime() % 10 == 0) {
-				this.fillFluidInit(tanks[2].getTankType());
-				this.fillFluidInit(tanks[3].getTankType());
-			}
 			if(worldObj.getTotalWorldTime() % 20 == 0) {
 				this.updateConnections();
 			}
@@ -160,17 +152,7 @@ public class TileEntityMachineChemplant extends TileEntityMachineBase implements
 				process();
 			}
 			
-			NBTTagCompound data = new NBTTagCompound();
-			data.setLong("power", this.power);
-			data.setInteger("progress", this.progress);
-			data.setInteger("maxProgress", this.maxProgress);
-			data.setBoolean("isProgressing", isProgressing);
-			
-			for(int i = 0; i < tanks.length; i++) {
-				tanks[i].writeToNBT(data, "t" + i);
-			}
-			
-			this.networkPack(data, 150);
+			this.networkPackNT(150);
 		} else {
 			
 			if(isProgressing && this.worldObj.getTotalWorldTime() % 3 == 0) {
@@ -205,24 +187,34 @@ public class TileEntityMachineChemplant extends TileEntityMachineBase implements
 			}
 		}
 	}
+
+	@Override
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeLong(power);
+		buf.writeInt(progress);
+		buf.writeInt(maxProgress);
+		buf.writeBoolean(isProgressing);
+
+		for(int i = 0; i < tanks.length; i++)
+			tanks[i].serialize(buf);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		power = buf.readLong();
+		progress = buf.readInt();
+		maxProgress = buf.readInt();
+		isProgressing = buf.readBoolean();
+
+		for(int i = 0; i < tanks.length; i++)
+			tanks[i].deserialize(buf);
+	}
 	
 	@Override
 	public AudioWrapper createAudioLoop() {
 		return MainRegistry.proxy.getLoopedSound("hbm:block.chemplantOperate", xCoord, yCoord, zCoord, 1.0F, 10F, 1.0F);
-	}
-
-	@Override
-	public void networkUnpack(NBTTagCompound nbt) {
-		super.networkUnpack(nbt);
-		
-		this.power = nbt.getLong("power");
-		this.progress = nbt.getInteger("progress");
-		this.maxProgress = nbt.getInteger("maxProgress");
-		this.isProgressing = nbt.getBoolean("isProgressing");
-
-		for(int i = 0; i < tanks.length; i++) {
-			tanks[i].readFromNBT(nbt, "t" + i);
-		}
 	}
 
 	@Override
@@ -509,107 +501,7 @@ public class TileEntityMachineChemplant extends TileEntityMachineBase implements
 
 	@Override
 	public long getMaxPower() {
-		return this.maxPower;
-	}
-
-	@Override
-	public void setFillForSync(int fill, int index) {
-		if(index >= 0 && index < tanks.length) tanks[index].setFill(fill);
-	}
-
-	@Override
-	public void setFluidFill(int fill, FluidType type) {
-		
-		for(FluidTank tank : tanks) {
-			if(tank.getTankType() == type) {
-				tank.setFill(fill);
-				return;
-			}
-		}
-	}
-
-	@Override
-	public void setTypeForSync(FluidType type, int index) {
-		if(index >= 0 && index < tanks.length) tanks[index].setTankType(type);
-	}
-
-	@Override
-	public int getFluidFill(FluidType type) {
-		
-		for(FluidTank tank : tanks) {
-			if(tank.getTankType() == type) {
-				return tank.getFill();
-			}
-		}
-		
-		return 0;
-	}
-
-	@Override
-	public int getMaxFluidFill(FluidType type) {
-		
-		for(int i = 0; i < 2; i++) {
-			if(tanks[i].getTankType() == type) {
-				return tanks[i].getMaxFill();
-			}
-		}
-		
-		return 0;
-	}
-
-	@Override
-	public void fillFluidInit(FluidType type) {
-		
-		/*
-		 *  ####
-		 * X####X
-		 * X##O#X
-		 *  ####
-		 */
-		
-		ForgeDirection dir = ForgeDirection.getOrientation(this.getBlockMetadata() - BlockDummyable.offset).getOpposite();
-		ForgeDirection rot = dir.getRotation(ForgeDirection.DOWN);
-
-		fillFluid(xCoord + rot.offsetX * 3,					yCoord,	zCoord + rot.offsetZ * 3,				this.getTact(), type);
-		fillFluid(xCoord - rot.offsetX * 2,					yCoord,	zCoord - rot.offsetZ * 2,				this.getTact(), type);
-		fillFluid(xCoord + rot.offsetX * 3 + dir.offsetX,	yCoord,	zCoord + rot.offsetZ * 3 + dir.offsetZ,	this.getTact(), type);
-		fillFluid(xCoord - rot.offsetX * 2 + dir.offsetX,	yCoord,	zCoord - rot.offsetZ * 2 + dir.offsetZ,	this.getTact(), type);
-	}
-
-	@Override
-	public void fillFluid(int x, int y, int z, boolean newTact, FluidType type) {
-		Library.transmitFluid(x, y, z, newTact, this, worldObj, type);
-	}
-
-	@Override
-	public boolean getTact() {
-		return worldObj.getTotalWorldTime() % 20 < 10;
-	}
-	
-	List<IFluidAcceptor>[] lists = new List[] {
-		new ArrayList(), new ArrayList(), new ArrayList(), new ArrayList()
-	};
-
-	@Override
-	public List<IFluidAcceptor> getFluidList(FluidType type) {
-		
-		for(int i = 0; i < tanks.length; i++) {
-			if(tanks[i].getTankType() == type) {
-				return lists[i];
-			}
-		}
-		
-		return new ArrayList();
-	}
-
-	@Override
-	public void clearFluidList(FluidType type) {
-		
-		for(int i = 0; i < tanks.length; i++) {
-			if(tanks[i].getTankType() == type) {
-				lists[i].clear();
-			}
-		}
+		return maxPower;
 	}
 	
 	@Override
@@ -683,7 +575,7 @@ public class TileEntityMachineChemplant extends TileEntityMachineBase implements
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIMachineChemplant(player.inventory, this);
 	}
 
@@ -696,12 +588,12 @@ public class TileEntityMachineChemplant extends TileEntityMachineBase implements
 	public void provideInfo(UpgradeType type, int level, List<String> info, boolean extendedInfo) {
 		info.add(IUpgradeInfoProvider.getStandardLabel(ModBlocks.machine_chemplant));
 		if(type == UpgradeType.SPEED) {
-			info.add(EnumChatFormatting.GREEN + I18nUtil.resolveKey(this.KEY_DELAY, "-" + (level * 25) + "%"));
-			info.add(EnumChatFormatting.RED + I18nUtil.resolveKey(this.KEY_CONSUMPTION, "+" + (level * 300) + "%"));
+			info.add(EnumChatFormatting.GREEN + I18nUtil.resolveKey(KEY_DELAY, "-" + (level * 25) + "%"));
+			info.add(EnumChatFormatting.RED + I18nUtil.resolveKey(KEY_CONSUMPTION, "+" + (level * 300) + "%"));
 		}
 		if(type == UpgradeType.POWER) {
-			info.add(EnumChatFormatting.GREEN + I18nUtil.resolveKey(this.KEY_CONSUMPTION, "-" + (level * 30) + "%"));
-			info.add(EnumChatFormatting.RED + I18nUtil.resolveKey(this.KEY_DELAY, "+" + (level * 5) + "%"));
+			info.add(EnumChatFormatting.GREEN + I18nUtil.resolveKey(KEY_CONSUMPTION, "-" + (level * 30) + "%"));
+			info.add(EnumChatFormatting.RED + I18nUtil.resolveKey(KEY_DELAY, "+" + (level * 5) + "%"));
 		}
 		if(type == UpgradeType.OVERDRIVE) {
 			info.add((BobMathUtil.getBlink() ? EnumChatFormatting.RED : EnumChatFormatting.DARK_GRAY) + "YES");

@@ -8,8 +8,8 @@ import com.hbm.explosion.ExplosionNT;
 import com.hbm.explosion.ExplosionNT.ExAttrib;
 import com.hbm.items.ModItems;
 import com.hbm.main.MainRegistry;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import net.minecraft.init.Blocks;
@@ -49,7 +49,6 @@ public class EntityMissileShuttle extends EntityMissileBaseNT {
 		list.add(new ItemStack(ModItems.plate_steel, 8));
 		list.add(new ItemStack(ModItems.thruster_medium, 2));
 		list.add(new ItemStack(ModItems.canister_empty, 1));
-		list.add(new ItemStack(ModItems.circuit_targeting_tier4, 1));
 		list.add(new ItemStack(Blocks.glass_pane, 2));
 
 		return list;

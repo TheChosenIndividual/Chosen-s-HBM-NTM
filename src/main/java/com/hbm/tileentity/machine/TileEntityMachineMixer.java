@@ -13,19 +13,16 @@ import com.hbm.inventory.recipes.MixerRecipes;
 import com.hbm.inventory.recipes.MixerRecipes.MixerRecipe;
 import com.hbm.items.machine.ItemMachineUpgrade.UpgradeType;
 import com.hbm.lib.Library;
-import com.hbm.tileentity.IGUIProvider;
-import com.hbm.tileentity.INBTPacketReceiver;
-import com.hbm.tileentity.IUpgradeInfoProvider;
-import com.hbm.tileentity.TileEntityMachineBase;
+import com.hbm.tileentity.*;
 import com.hbm.util.BobMathUtil;
 import com.hbm.util.I18nUtil;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidStandardTransceiver;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -34,7 +31,7 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
-public class TileEntityMachineMixer extends TileEntityMachineBase implements INBTPacketReceiver, IControlReceiver, IGUIProvider, IEnergyUser, IFluidStandardTransceiver, IUpgradeInfoProvider {
+public class TileEntityMachineMixer extends TileEntityMachineBase implements INBTPacketReceiver, IControlReceiver, IGUIProvider, IEnergyReceiverMK2, IFluidStandardTransceiver, IUpgradeInfoProvider, IFluidCopiable {
 	
 	public long power;
 	public static final long maxPower = 10_000;
@@ -121,7 +118,7 @@ public class TileEntityMachineMixer extends TileEntityMachineBase implements INB
 			for(int i = 0; i < 3; i++) {
 				tanks[i].writeToNBT(data, i + "");
 			}
-			this.networkPack(data, 50);
+			this.networkPackNT(50);
 			
 		} else {
 			
@@ -136,6 +133,30 @@ public class TileEntityMachineMixer extends TileEntityMachineBase implements INB
 				this.prevRotation -= 360;
 			}
 		}
+	}
+	
+	@Override
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeLong(power);
+		buf.writeInt(processTime);
+		buf.writeInt(progress);
+		buf.writeInt(recipeIndex);
+		buf.writeBoolean(wasOn);
+		
+		for(int i = 0; i < tanks.length; i++) tanks[i].serialize(buf);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		power = buf.readLong();
+		processTime = buf.readInt();
+		progress = buf.readInt();
+		recipeIndex = buf.readInt();
+		wasOn = buf.readBoolean();
+		
+		for(int i = 0; i < tanks.length; i++) tanks[i].deserialize(buf);
 	}
 
 	@Override
@@ -290,7 +311,7 @@ public class TileEntityMachineMixer extends TileEntityMachineBase implements INB
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIMixer(player.inventory, this);
 	}
 	
@@ -349,4 +370,10 @@ public class TileEntityMachineMixer extends TileEntityMachineBase implements INB
 		if(type == UpgradeType.OVERDRIVE) return 6;
 		return 0;
 	}
+
+	@Override
+	public FluidTank getTankToPaste() {
+		return this.tanks[2];
+	}
+
 }

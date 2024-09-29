@@ -12,8 +12,8 @@ import com.hbm.inventory.fluid.Fluids;
 import com.hbm.items.ModItems;
 import com.hbm.items.machine.ItemFluidIDMulti;
 import com.hbm.lib.RefStrings;
-import com.hbm.packet.NBTItemControlPacket;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toserver.NBTItemControlPacket;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
@@ -67,6 +67,7 @@ public class GUIScreenFluid extends GuiScreen {
 		this.search.setTextColor(-1);
 		this.search.setDisabledTextColour(-1);
 		this.search.setEnableBackgroundDrawing(false);
+		this.search.setFocused(true);
 		
 		if(player.getHeldItem() != null && player.getHeldItem().getItem() == ModItems.fluid_identifier_multi) {
 			this.primary = ItemFluidIDMulti.getType(player.getHeldItem(), true);

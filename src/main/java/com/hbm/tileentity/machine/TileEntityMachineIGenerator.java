@@ -1,33 +1,22 @@
 package com.hbm.tileentity.machine;
 
-import java.io.IOException;
-
-import com.google.gson.JsonObject;
-import com.google.gson.stream.JsonWriter;
 import com.hbm.blocks.BlockDummyable;
-import com.hbm.config.GeneralConfig;
-import com.hbm.interfaces.IFluidAcceptor;
 import com.hbm.inventory.container.ContainerIGenerator;
 import com.hbm.inventory.fluid.FluidType;
 import com.hbm.inventory.fluid.Fluids;
 import com.hbm.inventory.fluid.tank.FluidTank;
 import com.hbm.inventory.fluid.trait.FT_Flammable;
 import com.hbm.inventory.gui.GUIIGenerator;
-import com.hbm.items.ModItems;
-import com.hbm.lib.Library;
-import com.hbm.tileentity.IConfigurableMachine;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.TileEntityMachineBase;
-import com.hbm.util.RTGUtil;
+import com.hbm.util.CompatEnergyControl;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyGenerator;
 import api.hbm.fluid.IFluidStandardReceiver;
+import api.hbm.tile.IInfoProviderEC;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Items;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -37,7 +26,7 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityMachineIGenerator extends TileEntityMachineBase implements IFluidAcceptor, IEnergyGenerator, IFluidStandardReceiver, IConfigurableMachine, IGUIProvider {
+public class TileEntityMachineIGenerator extends TileEntityMachineBase implements IFluidStandardReceiver, IGUIProvider, IInfoProviderEC {
 	
 	public long power;
 	public int spin;
@@ -66,44 +55,15 @@ public class TileEntityMachineIGenerator extends TileEntityMachineBase implement
 	public static int waterRate = 10;
 	public static int lubeRate = 1;
 	public static long fluidHeatDiv = 1_000L;
-
-	@Override
-	public String getConfigName() {
-		return "igen";
-	}
-
-	@Override
-	public void readIfPresent(JsonObject obj) {
-		maxPower = IConfigurableMachine.grab(obj, "L:powerCap", maxPower);
-		waterCap = IConfigurableMachine.grab(obj, "I:waterCap", waterCap);
-		oilCap = IConfigurableMachine.grab(obj, "I:oilCap", oilCap);
-		lubeCap = IConfigurableMachine.grab(obj, "I:lubeCap", lubeCap);
-		coalGenRate = IConfigurableMachine.grab(obj, "I:solidFuelRate2", coalGenRate);
-		rtgHeatMult = IConfigurableMachine.grab(obj, "D:rtgHeatMult", rtgHeatMult);
-		waterRate = IConfigurableMachine.grab(obj, "I:waterRate", waterRate);
-		lubeRate = IConfigurableMachine.grab(obj, "I:lubeRate", lubeRate);
-		fluidHeatDiv = IConfigurableMachine.grab(obj, "D:fluidHeatDiv", fluidHeatDiv);
-	}
-
-	@Override
-	public void writeConfig(JsonWriter writer) throws IOException {
-		writer.name("L:powerCap").value(maxPower);
-		writer.name("I:waterCap").value(waterCap);
-		writer.name("I:oilCap").value(oilCap);
-		writer.name("I:lubeCap").value(lubeCap);
-		writer.name("I:solidFuelRate2").value(coalGenRate);
-		writer.name("D:rtgHeatMult").value(rtgHeatMult);
-		writer.name("I:waterRate").value(waterRate);
-		writer.name("I:lubeRate").value(lubeRate);
-		writer.name("D:fluidHeatDiv").value(fluidHeatDiv);
-	}
+	
+	protected long output;
 
 	public TileEntityMachineIGenerator() {
 		super(21);
 		tanks = new FluidTank[3];
-		tanks[0] = new FluidTank(Fluids.WATER, waterCap, 0);
-		tanks[1] = new FluidTank(Fluids.HEATINGOIL, oilCap, 1);
-		tanks[2] = new FluidTank(Fluids.LUBRICANT, lubeCap, 2);
+		tanks[0] = new FluidTank(Fluids.WATER, waterCap);
+		tanks[1] = new FluidTank(Fluids.HEATINGOIL, oilCap);
+		tanks[2] = new FluidTank(Fluids.LUBRICANT, lubeCap);
 	}
 
 	@Override
@@ -125,7 +85,7 @@ public class TileEntityMachineIGenerator extends TileEntityMachineBase implement
 	@Override
 	public void updateEntity() {
 		
-		if(!worldObj.isRemote) {
+		/*if(!worldObj.isRemote) {
 			
 			boolean con = GeneralConfig.enableLBSM && GeneralConfig.enableLBSMIGen;
 			
@@ -219,7 +179,8 @@ public class TileEntityMachineIGenerator extends TileEntityMachineBase implement
 					this.tanks[2].setFill(this.tanks[2].getFill() - lubeRate);
 				}
 				
-				this.power += this.spin * genMult;
+				this.output = (long) (this.spin * genMult);
+				this.power += this.output;
 				
 				if(this.power > this.maxPower)
 					this.power = this.maxPower;
@@ -247,7 +208,7 @@ public class TileEntityMachineIGenerator extends TileEntityMachineBase implement
 				this.rotation -= 360;
 				this.prevRotation -= 360;
 			}
-		}
+		}*/
 	}
 
 	@Override
@@ -273,47 +234,6 @@ public class TileEntityMachineIGenerator extends TileEntityMachineBase implement
 	public int getPowerFromFuel(boolean con) {
 		FluidType type = tanks[1].getTankType();
 		return type.hasTrait(FT_Flammable.class) ? (int)(type.getTrait(FT_Flammable.class).getHeatEnergy() / (con ? 5000L : fluidHeatDiv)) : 0;
-	}
-
-	@Override
-	public void setFillForSync(int fill, int index) {
-		tanks[index].setFill(fill);
-	}
-
-	@Override
-	public void setFluidFill(int fill, FluidType type) {
-		
-		if(type == Fluids.WATER)
-			tanks[0].setFill(fill);
-		else if(type == Fluids.LUBRICANT)
-			tanks[2].setFill(fill);
-		else if(tanks[1].getTankType() == type)
-			tanks[1].setFill(fill);
-	}
-
-	@Override
-	public void setTypeForSync(FluidType type, int index) {
-		tanks[index].setTankType(type);
-	}
-
-	@Override
-	public int getFluidFill(FluidType type) {
-		
-		for(int i = 0; i < 3; i++)
-			if(tanks[i].getTankType() == type)
-				return tanks[i].getFill();
-		
-		return 0;
-	}
-
-	@Override
-	public int getMaxFluidFill(FluidType type) {
-		
-		for(int i = 0; i < 3; i++)
-			if(tanks[i].getTankType() == type)
-				return tanks[i].getMaxFill();
-		
-		return 0;
 	}
 	
 	@Override
@@ -345,24 +265,8 @@ public class TileEntityMachineIGenerator extends TileEntityMachineBase implement
 	
 	@Override
 	@SideOnly(Side.CLIENT)
-	public double getMaxRenderDistanceSquared()
-	{
+	public double getMaxRenderDistanceSquared() {
 		return 65536.0D;
-	}
-
-	@Override
-	public void setPower(long power) {
-		this.power = power;
-	}
-
-	@Override
-	public long getPower() {
-		return this.power;
-	}
-
-	@Override
-	public long getMaxPower() {
-		return this.maxPower;
 	}
 
 	@Override
@@ -382,7 +286,13 @@ public class TileEntityMachineIGenerator extends TileEntityMachineBase implement
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIIGenerator(player.inventory, this);
+	}
+
+	@Override
+	public void provideExtraInfo(NBTTagCompound data) {
+		data.setBoolean(CompatEnergyControl.B_ACTIVE, this.output > 0);
+		data.setDouble(CompatEnergyControl.D_OUTPUT_HE, this.output);
 	}
 }

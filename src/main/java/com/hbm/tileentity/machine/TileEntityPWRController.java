@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import com.hbm.blocks.ModBlocks;
+import com.hbm.handler.CompatHandler;
 import com.hbm.interfaces.IControlReceiver;
 import com.hbm.inventory.container.ContainerPWR;
 import com.hbm.inventory.fluid.Fluids;
@@ -33,7 +34,6 @@ import li.cil.oc.api.machine.Callback;
 import li.cil.oc.api.machine.Context;
 import li.cil.oc.api.network.SimpleComponent;
 import net.minecraft.block.Block;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -43,17 +43,18 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
 @Optional.InterfaceList({@Optional.Interface(iface = "li.cil.oc.api.network.SimpleComponent", modid = "OpenComputers")})
-public class TileEntityPWRController extends TileEntityMachineBase implements IGUIProvider, IControlReceiver, SimpleComponent, IFluidStandardTransceiver {
+public class TileEntityPWRController extends TileEntityMachineBase implements IGUIProvider, IControlReceiver, SimpleComponent, IFluidStandardTransceiver, CompatHandler.OCComponent {
 	
 	public FluidTank[] tanks;
 	public int coreHeat;
-	public static final int coreHeatCapacity = 10_000_000;
+	public static final int coreHeatCapacityBase = 10_000_000;
+	public int coreHeatCapacity = 10_000_000;
 	public int hullHeat;
-	public static final int hullHeatCapacity = 10_000_000;
+	public static final int hullHeatCapacityBase = 10_000_000;
 	public double flux;
 	
-	public int rodLevel = 100;
-	public int rodTarget = 100;
+	public double rodLevel = 100;
+	public double rodTarget = 100;
 	
 	public int typeLoaded;
 	public int amountLoaded;
@@ -64,6 +65,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 	public int connections;
 	public int connectionsControlled;
 	public int heatexCount;
+	public int heatsinkCount;
 	public int channelCount;
 	public int sourceCount;
 	
@@ -91,6 +93,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 		connectionsControlled = 0;
 		heatexCount = 0;
 		channelCount = 0;
+		heatsinkCount = 0;
 		sourceCount = 0;
 		ports.clear();
 		rods.clear();
@@ -104,6 +107,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 			if(block == ModBlocks.pwr_fuel) rodCount++;
 			if(block == ModBlocks.pwr_heatex) heatexCount++;
 			if(block == ModBlocks.pwr_channel) channelCount++;
+			if(block == ModBlocks.pwr_heatsink) heatsinkCount++;
 			if(block == ModBlocks.pwr_neutron_source) sourceCount++;
 			if(block == ModBlocks.pwr_port) ports.add(entry.getKey());
 		}
@@ -144,6 +148,8 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 
 		connections = connectionsDouble / 2;
 		connectionsControlled = connectionsControlledDouble / 2;
+		
+		this.coreHeatCapacity = this.coreHeatCapacityBase + this.heatsinkCount * this.coreHeatCapacityBase / 20;
 	}
 
 	@Override
@@ -164,12 +170,12 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 			int chunkX = xCoord >> 4;
 			int chunkZ = zCoord >> 4;
 			
-			//since fluid sources are often not within 1 chunk, we just do 3 chunks distance and call it a day
+			//since fluid sources are often not within 1 chunk, we just do 2 chunks distance and call it a day
 			if(!worldObj.getChunkProvider().chunkExists(chunkX, chunkZ) ||
-					!worldObj.getChunkProvider().chunkExists(chunkX + 3, chunkZ + 3) ||
-					!worldObj.getChunkProvider().chunkExists(chunkX + 3, chunkZ - 3) ||
-					!worldObj.getChunkProvider().chunkExists(chunkX - 3, chunkZ + 3) ||
-					!worldObj.getChunkProvider().chunkExists(chunkX - 3, chunkZ - 3)) {
+					!worldObj.getChunkProvider().chunkExists(chunkX + 2, chunkZ + 2) ||
+					!worldObj.getChunkProvider().chunkExists(chunkX + 2, chunkZ - 2) ||
+					!worldObj.getChunkProvider().chunkExists(chunkX - 2, chunkZ + 2) ||
+					!worldObj.getChunkProvider().chunkExists(chunkX - 2, chunkZ - 2)) {
 				this.unloadDelay = 60;
 			}
 			
@@ -196,7 +202,8 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 						this.decrStackSize(0, 1);
 						this.markChanged();
 					}
-		
+					double diff = this.rodLevel - this.rodTarget;
+					if(diff < 1 && diff > -1) this.rodLevel = this.rodTarget;
 					if(this.rodTarget > this.rodLevel) this.rodLevel++;
 					if(this.rodTarget < this.rodLevel) this.rodLevel--;
 					
@@ -238,7 +245,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 					if(amountLoaded > rodCount) amountLoaded = rodCount;
 					
 					/* CORE COOLING */
-					double coreCoolingApproachNum = getXOverE((double) this.heatexCount * 5 / (double) this.rodCount, 2) / 2D;
+					double coreCoolingApproachNum = getXOverE((double) this.heatexCount * 5 / (double) getRodCountForCoolant(), 2) / 2D;
 					int averageCoreHeat = (this.coreHeat + this.hullHeat) / 2;
 					this.coreHeat -= (coreHeat - averageCoreHeat) * coreCoolingApproachNum;
 					this.hullHeat -= (hullHeat - averageCoreHeat) * coreCoolingApproachNum;
@@ -274,8 +281,9 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 			data.setDouble("progress", progress);
 			data.setInteger("typeLoaded", typeLoaded);
 			data.setInteger("amountLoaded", amountLoaded);
-			data.setInteger("rodLevel", rodLevel);
-			data.setInteger("rodTarget", rodTarget);
+			data.setDouble("rodLevel", rodLevel);
+			data.setDouble("rodTarget", rodTarget);
+			data.setInteger("coreHeatCapacity", coreHeatCapacity);
 			this.networkPack(data, 150);
 		} else {
 			
@@ -356,7 +364,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 		FT_Heatable trait = tanks[0].getTankType().getTrait(FT_Heatable.class);
 		if(trait == null || trait.getEfficiency(HeatingType.PWR) <= 0) return;
 		
-		double coolingEff = (double) this.channelCount / (double) this.rodCount * 0.1D; //10% cooling if numbers match
+		double coolingEff = (double) this.channelCount / (double) getRodCountForCoolant() * 0.1D; //10% cooling if numbers match
 		if(coolingEff > 1D) coolingEff = 1D;
 		
 		int heatToUse = Math.min(this.hullHeat, (int) (this.hullHeat * coolingEff * trait.getEfficiency(HeatingType.PWR)));
@@ -369,6 +377,10 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 		this.hullHeat -= step.heatReq * cycles;
 		this.tanks[0].setFill(tanks[0].getFill() - step.amountReq * cycles);
 		this.tanks[1].setFill(tanks[1].getFill() + step.amountProduced * cycles);
+	}
+	
+	protected int getRodCountForCoolant() {
+		return this.rodCount + (int) Math.ceil(this.heatsinkCount / 4D);
 	}
 	
 	public void networkUnpack(NBTTagCompound nbt) {
@@ -384,8 +396,9 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 		progress = nbt.getDouble("progress");
 		typeLoaded = nbt.getInteger("typeLoaded");
 		amountLoaded = nbt.getInteger("amountLoaded");
-		rodLevel = nbt.getInteger("rodLevel");
+		rodLevel = nbt.getDouble("rodLevel");
 		rodTarget = nbt.getInteger("rodTarget");
+		coreHeatCapacity = nbt.getInteger("coreHeatCapacity");
 	}
 	
 	protected void setupTanks() {
@@ -442,12 +455,14 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 		this.coreHeat = nbt.getInteger("coreHeat");
 		this.hullHeat = nbt.getInteger("hullHeat");
 		this.flux = nbt.getDouble("flux");
-		this.rodLevel = nbt.getInteger("rodLevel");
-		this.rodTarget = nbt.getInteger("rodTarget");
+		this.rodLevel = nbt.getDouble("rodLevel");
+		this.rodTarget = nbt.getDouble("rodTarget");
 		this.typeLoaded = nbt.getInteger("typeLoaded");
 		this.amountLoaded = nbt.getInteger("amountLoaded");
 		this.progress = nbt.getDouble("progress");
 		this.processTime = nbt.getDouble("processTime");
+		this.coreHeatCapacity = nbt.getInteger("coreHeatCapacity");
+		if(this.coreHeatCapacity < this.coreHeatCapacityBase) this.coreHeatCapacity = this.coreHeatCapacityBase;
 
 		this.rodCount = nbt.getInteger("rodCount");
 		this.connections = nbt.getInteger("connections");
@@ -455,6 +470,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 		this.heatexCount = nbt.getInteger("heatexCount");
 		this.channelCount = nbt.getInteger("channelCount");
 		this.sourceCount = nbt.getInteger("sourceCount");
+		this.heatsinkCount = nbt.getInteger("heatsinkCount");
 		
 		ports.clear();
 		int portCount = nbt.getInteger("portCount");
@@ -484,12 +500,13 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 		nbt.setInteger("coreHeat", coreHeat);
 		nbt.setInteger("hullHeat", hullHeat);
 		nbt.setDouble("flux", flux);
-		nbt.setInteger("rodLevel", rodLevel);
-		nbt.setInteger("rodTarget", rodTarget);
+		nbt.setDouble("rodLevel", rodLevel);
+		nbt.setDouble("rodTarget", rodTarget);
 		nbt.setInteger("typeLoaded", typeLoaded);
 		nbt.setInteger("amountLoaded", amountLoaded);
 		nbt.setDouble("progress", progress);
 		nbt.setDouble("processTime", processTime);
+		nbt.setInteger("coreHeatCapacity", coreHeatCapacity);
 
 		nbt.setInteger("rodCount", rodCount);
 		nbt.setInteger("connections", connections);
@@ -497,6 +514,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 		nbt.setInteger("heatexCount", heatexCount);
 		nbt.setInteger("channelCount", channelCount);
 		nbt.setInteger("sourceCount", sourceCount);
+		nbt.setInteger("heatsinkCount", heatsinkCount);
 		
 		nbt.setInteger("portCount", ports.size());
 		for(int i = 0; i < ports.size(); i++) {
@@ -528,6 +546,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 
 	// do some opencomputer stuff
 	@Override
+	@Optional.Method(modid = "OpenComputers")
 	public String getComponentName() {
 		return "ntm_pwr_control";
 	}
@@ -571,7 +590,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 	@Callback(direct = true, limit = 4)
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] setLevel(Context context, Arguments args) {
-		rodTarget = MathHelper.clamp_int(args.checkInteger(0), 0, 100);
+		rodTarget = MathHelper.clamp_double(args.checkDouble(0), 0, 100);
 		this.markChanged();
 		return new Object[] {true};
 	}
@@ -583,7 +602,7 @@ public class TileEntityPWRController extends TileEntityMachineBase implements IG
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIPWR(player.inventory, this);
 	}
 

@@ -16,7 +16,7 @@ import com.hbm.tileentity.TileEntityMachineBase;
 import com.hbm.util.InventoryUtil;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidUser;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.ISidedInventory;
@@ -32,7 +32,7 @@ import net.minecraft.tileentity.TileEntity;
  * Tanks follow the order R1(I1, I2, O1, O2), R2(I1, I2, O1, O2) ...
  * @author hbm
  */
-public abstract class TileEntityMachineChemplantBase extends TileEntityMachineBase implements IEnergyUser, IFluidUser, IGUIProvider {
+public abstract class TileEntityMachineChemplantBase extends TileEntityMachineBase implements IEnergyReceiverMK2, IFluidUser, IGUIProvider {
 
 	public long power;
 	public int[] progress;
@@ -54,7 +54,7 @@ public abstract class TileEntityMachineChemplantBase extends TileEntityMachineBa
 		
 		tanks = new FluidTank[4 * count];
 		for(int i = 0; i < 4 * count; i++) {
-			tanks[i] = new FluidTank(Fluids.NONE, getTankCapacity(), i);
+			tanks[i] = new FluidTank(Fluids.NONE, getTankCapacity());
 		}
 	}
 
@@ -372,7 +372,7 @@ public abstract class TileEntityMachineChemplantBase extends TileEntityMachineBa
 		
 		for(int i = 0; i < tanks.length; i++) {
 			FluidTank tank = tanks[i];
-			if(tank.index % 4 < 2) {
+			if(i % 4 < 2) {
 				inTanks.add(tank);
 			}
 		}
@@ -493,7 +493,7 @@ public abstract class TileEntityMachineChemplantBase extends TileEntityMachineBa
 		
 		for(int i = 0; i < tanks.length; i++) {
 			FluidTank tank = tanks[i];
-			if(tank.index % 4 > 1) {
+			if(i % 4 > 1) {
 				outTanks.add(tank);
 			}
 		}

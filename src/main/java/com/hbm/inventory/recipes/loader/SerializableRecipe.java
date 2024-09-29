@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 import com.google.gson.Gson;
@@ -36,6 +37,8 @@ public abstract class SerializableRecipe {
 	public static final Gson gson = new Gson();
 	public static List<SerializableRecipe> recipeHandlers = new ArrayList();
 	
+	public boolean modified = false;
+	
 	/*
 	 * INIT
 	 */
@@ -44,6 +47,7 @@ public abstract class SerializableRecipe {
 		recipeHandlers.add(new PressRecipes());
 		recipeHandlers.add(new BlastFurnaceRecipes());
 		recipeHandlers.add(new ShredderRecipes());
+		recipeHandlers.add(new SolderingRecipes());
 		recipeHandlers.add(new ChemplantRecipes());
 		recipeHandlers.add(new CombinationRecipes());
 		recipeHandlers.add(new CrucibleRecipes());
@@ -56,6 +60,7 @@ public abstract class SerializableRecipe {
 		recipeHandlers.add(new LiquefactionRecipes());
 		recipeHandlers.add(new SolidificationRecipes());
 		recipeHandlers.add(new CokerRecipes());
+		recipeHandlers.add(new PyroOvenRecipes());
 		recipeHandlers.add(new BreederRecipes());
 		recipeHandlers.add(new CyclotronRecipes());
 		recipeHandlers.add(new HadronRecipes());
@@ -66,10 +71,14 @@ public abstract class SerializableRecipe {
 		recipeHandlers.add(new ElectrolyserFluidRecipes());
 		recipeHandlers.add(new ElectrolyserMetalRecipes());
 		recipeHandlers.add(new ArcWelderRecipes());
+		recipeHandlers.add(new RotaryFurnaceRecipes());
 		recipeHandlers.add(new ExposureChamberRecipes());
+		recipeHandlers.add(new AssemblerRecipes());
 		
 		recipeHandlers.add(new MatDistribution());
 		recipeHandlers.add(new CustomMachineRecipes());
+		//AFTER MatDistribution
+		recipeHandlers.add(new ArcFurnaceRecipes());
 	}
 	
 	public static void initialize() {
@@ -94,6 +103,7 @@ public abstract class SerializableRecipe {
 			if(recFile.exists() && recFile.isFile()) {
 				MainRegistry.logger.info("Reading recipe file " + recFile.getName());
 				recipe.readRecipeFile(recFile);
+				recipe.modified = true;
 			} else {
 				MainRegistry.logger.info("No recipe file found, registering defaults for " + recipe.getFileName());
 				recipe.registerDefaults();
@@ -101,6 +111,7 @@ public abstract class SerializableRecipe {
 				File recTemplate = new File(recDir.getAbsolutePath() + File.separatorChar + "_" + recipe.getFileName());
 				MainRegistry.logger.info("Writing template file " + recTemplate.getName());
 				recipe.writeTemplateFile(recTemplate);
+				recipe.modified = false;
 			}
 			
 			recipe.registerPost();
@@ -335,5 +346,34 @@ public abstract class SerializableRecipe {
 		if(stack.pressure != 0) writer.value(stack.pressure);
 		writer.endArray();
 		writer.setIndent("  ");
+	}
+	
+	public static boolean matchesIngredients(ItemStack[] inputs, AStack[] recipe) {
+
+		List<AStack> recipeList = new ArrayList();
+		for(AStack ingredient : recipe) recipeList.add(ingredient);
+		
+		for(int i = 0; i < inputs.length; i++) {
+			ItemStack inputStack = inputs[i];
+
+			if(inputStack != null) {
+				boolean hasMatch = false;
+				Iterator<AStack> iterator = recipeList.iterator();
+
+				while(iterator.hasNext()) {
+					AStack recipeStack = iterator.next();
+
+					if(recipeStack.matchesRecipe(inputStack, true) && inputStack.stackSize >= recipeStack.stacksize) {
+						hasMatch = true;
+						recipeList.remove(recipeStack);
+						break;
+					}
+				}
+				if(!hasMatch) {
+					return false;
+				}
+			}
+		}
+		return recipeList.isEmpty();
 	}
 }

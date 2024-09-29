@@ -1,11 +1,16 @@
 package com.hbm.tileentity.machine;
 
+import java.io.IOException;
+
+import com.google.gson.JsonObject;
+import com.google.gson.stream.JsonWriter;
 import com.hbm.inventory.fluid.FluidType;
 import com.hbm.inventory.fluid.Fluids;
 import com.hbm.inventory.fluid.tank.FluidTank;
+import com.hbm.tileentity.IConfigurableMachine;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.nbt.NBTTagCompound;
@@ -13,19 +18,44 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityCondenserPowered extends TileEntityCondenser implements IEnergyUser {
+public class TileEntityCondenserPowered extends TileEntityCondenser implements IEnergyReceiverMK2 {
 	
 	public long power;
-	public static final long maxPower = 10_000_000;
 	public float spin;
 	public float lastSpin;
 	
+	//Configurable values
+	public static long maxPower = 10_000_000;
+	public static int inputTankSizeP = 1_000_000;
+	public static int outputTankSizeP = 1_000_000;
+	public static int powerConsumption = 10;
+
 	public TileEntityCondenserPowered() {
 		tanks = new FluidTank[2];
-		tanks[0] = new FluidTank(Fluids.SPENTSTEAM, 100_000);
-		tanks[1] = new FluidTank(Fluids.WATER, 100_000);
+		tanks[0] = new FluidTank(Fluids.SPENTSTEAM, inputTankSizeP);
+		tanks[1] = new FluidTank(Fluids.WATER, outputTankSizeP);
 	}
 	
+	@Override
+	public String getConfigName() {
+		return "condenserPowered";
+	}
+	@Override
+	public void readIfPresent(JsonObject obj) {
+		maxPower = IConfigurableMachine.grab(obj, "L:maxPower", maxPower);
+		inputTankSizeP = IConfigurableMachine.grab(obj, "I:inputTankSize", inputTankSizeP);
+		outputTankSizeP = IConfigurableMachine.grab(obj, "I:outputTankSize", outputTankSizeP);
+		powerConsumption = IConfigurableMachine.grab(obj, "I:powerConsumption", powerConsumption);
+	}
+
+	@Override
+	public void writeConfig(JsonWriter writer) throws IOException {
+		writer.name("L:maxPower").value(maxPower);
+		writer.name("I:inputTankSize").value(inputTankSizeP);
+		writer.name("I:outputTankSize").value(outputTankSizeP);
+		writer.name("I:powerConsumption").value(powerConsumption);
+	}
+
 	@Override
 	public void updateEntity() {
 		super.updateEntity();
@@ -63,7 +93,7 @@ public class TileEntityCondenserPowered extends TileEntityCondenser implements I
 
 	@Override
 	public void postConvert(int convert) {
-		this.power -= convert * 10;
+		this.power -= convert * powerConsumption;
 		if(this.power < 0) this.power = 0;
 	}
 
@@ -90,8 +120,6 @@ public class TileEntityCondenserPowered extends TileEntityCondenser implements I
 		tanks[0].writeToNBT(nbt, "water");
 		tanks[1].writeToNBT(nbt, "steam");
 	}
-
-	@Deprecated @Override public void fillFluidInit(FluidType type) { }
 
 	@Override
 	public void subscribeToAllAround(FluidType type, TileEntity te) {

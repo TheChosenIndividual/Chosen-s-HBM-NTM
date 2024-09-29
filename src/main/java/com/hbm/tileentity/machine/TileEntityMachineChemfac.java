@@ -14,6 +14,7 @@ import com.hbm.inventory.gui.GUIChemfac;
 import com.hbm.items.machine.ItemMachineUpgrade;
 import com.hbm.items.machine.ItemMachineUpgrade.UpgradeType;
 import com.hbm.lib.Library;
+import com.hbm.tileentity.IFluidCopiable;
 import com.hbm.tileentity.IUpgradeInfoProvider;
 import com.hbm.util.BobMathUtil;
 import com.hbm.util.I18nUtil;
@@ -21,7 +22,7 @@ import com.hbm.util.fauxpointtwelve.DirPos;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -31,7 +32,7 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityMachineChemfac extends TileEntityMachineChemplantBase implements IUpgradeInfoProvider {
+public class TileEntityMachineChemfac extends TileEntityMachineChemplantBase implements IUpgradeInfoProvider, IFluidCopiable {
 	
 	float rotSpeed;
 	public float rot;
@@ -43,8 +44,8 @@ public class TileEntityMachineChemfac extends TileEntityMachineChemplantBase imp
 	public TileEntityMachineChemfac() {
 		super(77);
 
-		water = new FluidTank(Fluids.WATER, 64_000, tanks.length);
-		steam = new FluidTank(Fluids.SPENTSTEAM, 64_000, tanks.length + 1);
+		water = new FluidTank(Fluids.WATER, 64_000);
+		steam = new FluidTank(Fluids.SPENTSTEAM, 64_000);
 	}
 
 	@Override
@@ -101,19 +102,7 @@ public class TileEntityMachineChemfac extends TileEntityMachineChemplantBase imp
 				this.speed = 1;
 			}
 			
-			NBTTagCompound data = new NBTTagCompound();
-			data.setLong("power", this.power);
-			data.setIntArray("progress", this.progress);
-			data.setIntArray("maxProgress", this.maxProgress);
-			data.setBoolean("isProgressing", isProgressing);
-			
-			for(int i = 0; i < tanks.length; i++) {
-				tanks[i].writeToNBT(data, "t" + i);
-			}
-			water.writeToNBT(data, "w");
-			steam.writeToNBT(data, "s");
-			
-			this.networkPack(data, 150);
+			this.networkPackNT(150);
 		} else {
 			
 			float maxSpeed = 30F;
@@ -156,21 +145,39 @@ public class TileEntityMachineChemfac extends TileEntityMachineChemplantBase imp
 			}
 		}
 	}
-
+	
 	@Override
-	public void networkUnpack(NBTTagCompound nbt) {
-		super.networkUnpack(nbt);
-		
-		this.power = nbt.getLong("power");
-		this.progress = nbt.getIntArray("progress");
-		this.maxProgress = nbt.getIntArray("maxProgress");
-		this.isProgressing = nbt.getBoolean("isProgressing");
-
-		for(int i = 0; i < tanks.length; i++) {
-			tanks[i].readFromNBT(nbt, "t" + i);
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeLong(power);
+		for(int i = 0; i < getRecipeCount(); i++) {
+			buf.writeInt(progress[i]);
+			buf.writeInt(maxProgress[i]);
 		}
-		water.readFromNBT(nbt, "w");
-		steam.readFromNBT(nbt, "s");
+		
+		buf.writeBoolean(isProgressing);
+		
+		for(int i = 0; i < tanks.length; i++) tanks[i].serialize(buf);
+		
+		water.serialize(buf);
+		steam.serialize(buf);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		power = buf.readLong();
+		for(int i = 0; i < getRecipeCount(); i++) {
+			progress[i] = buf.readInt();
+			maxProgress[i] = buf.readInt();
+		}
+		
+		isProgressing = buf.readBoolean();
+		
+		for(int i = 0; i < tanks.length; i++) tanks[i].deserialize(buf);
+		
+		water.deserialize(buf);
+		steam.deserialize(buf);
 	}
 	
 	private int getWaterRequired() {
@@ -350,7 +357,7 @@ public class TileEntityMachineChemfac extends TileEntityMachineChemplantBase imp
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIChemfac(player.inventory, this);
 	}
 
@@ -381,5 +388,10 @@ public class TileEntityMachineChemfac extends TileEntityMachineChemplantBase imp
 		if(type == UpgradeType.POWER) return 3;
 		if(type == UpgradeType.OVERDRIVE) return 12;
 		return 0;
+	}
+
+	@Override
+	public FluidTank getTankToPaste() {
+		return null;
 	}
 }

@@ -130,6 +130,7 @@ public class ItemRenderMissileGeneric implements IItemRenderer {
 	
 	public static void init() {
 
+		renderers.put(new ComparableStack(ModItems.missile_test), generateStandard(ResourceManager.missileMicroTest_tex, ResourceManager.missileMicro));
 		renderers.put(new ComparableStack(ModItems.missile_taint), generateStandard(ResourceManager.missileTaint_tex, ResourceManager.missileMicro));
 		renderers.put(new ComparableStack(ModItems.missile_micro), generateStandard(ResourceManager.missileMicro_tex, ResourceManager.missileMicro));
 		renderers.put(new ComparableStack(ModItems.missile_bhole), generateStandard(ResourceManager.missileMicroBHole_tex, ResourceManager.missileMicro));
@@ -164,24 +165,7 @@ public class ItemRenderMissileGeneric implements IItemRenderer {
 		renderers.put(new ComparableStack(ModItems.missile_nuclear_cluster), generateStandard(ResourceManager.missileMIRV_tex, ResourceManager.missileNuclear));
 		renderers.put(new ComparableStack(ModItems.missile_volcano), generateStandard(ResourceManager.missileVolcano_tex, ResourceManager.missileNuclear));
 		renderers.put(new ComparableStack(ModItems.missile_doomsday), generateStandard(ResourceManager.missileDoomsday_tex, ResourceManager.missileNuclear));
-
-		renderers.put(new ComparableStack(ModItems.missile_carrier), x -> {
-			GL11.glScalef(2F, 2F, 2F);
-			x.bindTexture(ResourceManager.missileCarrier_tex);
-			ResourceManager.missileCarrier.renderAll();
-			GL11.glTranslated(0.0D, 0.5D, 0.0D);
-			GL11.glTranslated(1.25D, 0.0D, 0.0D);
-			x.bindTexture(ResourceManager.missileBooster_tex);
-			ResourceManager.missileBooster.renderAll();
-			GL11.glTranslated(-2.5D, 0.0D, 0.0D);
-			ResourceManager.missileBooster.renderAll();
-			GL11.glTranslated(1.25D, 0.0D, 0.0D);
-			GL11.glTranslated(0.0D, 0.0D, 1.25D);
-			ResourceManager.missileBooster.renderAll();
-			GL11.glTranslated(0.0D, 0.0D, -2.5D);
-			ResourceManager.missileBooster.renderAll();
-			GL11.glTranslated(0.0D, 0.0D, 1.25D);
-		});
+		renderers.put(new ComparableStack(ModItems.missile_doomsday_rusted), generateStandard(ResourceManager.missileDoomsdayRusted_tex, ResourceManager.missileNuclear));
 
 		renderers.put(new ComparableStack(ModItems.missile_shuttle), generateStandard(ResourceManager.missileShuttle_tex, ResourceManager.missileShuttle));
 	}

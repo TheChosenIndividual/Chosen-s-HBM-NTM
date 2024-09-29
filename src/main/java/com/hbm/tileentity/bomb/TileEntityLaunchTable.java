@@ -2,12 +2,9 @@ package com.hbm.tileentity.bomb;
 
 import java.util.List;
 
-import com.hbm.blocks.ModBlocks;
-import com.hbm.blocks.bomb.LaunchPad;
 import com.hbm.entity.missile.EntityMissileCustom;
+import com.hbm.handler.CompatHandler;
 import com.hbm.handler.MissileStruct;
-import com.hbm.interfaces.IFluidAcceptor;
-import com.hbm.interfaces.IFluidContainer;
 import com.hbm.inventory.container.ContainerLaunchTable;
 import com.hbm.inventory.fluid.FluidType;
 import com.hbm.inventory.fluid.Fluids;
@@ -20,26 +17,25 @@ import com.hbm.items.weapon.ItemCustomMissilePart.FuelType;
 import com.hbm.items.weapon.ItemCustomMissilePart.PartSize;
 import com.hbm.lib.Library;
 import com.hbm.main.MainRegistry;
-import com.hbm.packet.AuxElectricityPacket;
-import com.hbm.packet.AuxGaugePacket;
 import com.hbm.packet.PacketDispatcher;
-import com.hbm.packet.TEMissileMultipartPacket;
+import com.hbm.packet.toclient.BufPacket;
+import com.hbm.packet.toclient.TEMissileMultipartPacket;
+import com.hbm.tileentity.IBufPacketReceiver;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.IRadarCommandReceiver;
 import com.hbm.tileentity.TileEntityLoadedBase;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidStandardReceiver;
 import api.hbm.item.IDesignatorItem;
 import cpw.mods.fml.common.Optional;
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import io.netty.buffer.ByteBuf;
 import li.cil.oc.api.machine.Arguments;
 import li.cil.oc.api.machine.Callback;
 import li.cil.oc.api.machine.Context;
-import li.cil.oc.api.network.SimpleComponent;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
@@ -55,7 +51,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
 @Optional.InterfaceList({@Optional.Interface(iface = "li.cil.oc.api.network.SimpleComponent", modid = "OpenComputers")})
-public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISidedInventory, IEnergyUser, IFluidContainer, IFluidAcceptor, IFluidStandardReceiver, IGUIProvider, SimpleComponent, IRadarCommandReceiver {
+public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISidedInventory, IEnergyReceiverMK2, IFluidStandardReceiver, IGUIProvider, IBufPacketReceiver, IRadarCommandReceiver, CompatHandler.OCComponent {
 
 	private ItemStack slots[];
 
@@ -76,8 +72,8 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 	public TileEntityLaunchTable() {
 		slots = new ItemStack[8];
 		tanks = new FluidTank[2];
-		tanks[0] = new FluidTank(Fluids.NONE, 100000, 0);
-		tanks[1] = new FluidTank(Fluids.NONE, 100000, 1);
+		tanks[0] = new FluidTank(Fluids.NONE, 100000);
+		tanks[1] = new FluidTank(Fluids.NONE, 100000);
 		padSize = PartSize.SIZE_10;
 		height = 10;
 	}
@@ -192,9 +188,6 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 
 			tanks[0].loadTank(2, 6, slots);
 			tanks[1].loadTank(3, 7, slots);
-
-			for (int i = 0; i < 2; i++)
-				tanks[i].updateTank(xCoord, yCoord, zCoord, worldObj.provider.dimensionId);
 			
 			power = Library.chargeTEFromItems(slots, 5, power, maxPower);
 			
@@ -204,9 +197,7 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 				solid += 250;
 			}
 			
-			PacketDispatcher.wrapper.sendToAllAround(new AuxElectricityPacket(xCoord, yCoord, zCoord, power), new TargetPoint(worldObj.provider.dimensionId, xCoord, yCoord, zCoord, 50));
-			PacketDispatcher.wrapper.sendToAllAround(new AuxGaugePacket(xCoord, yCoord, zCoord, solid, 0), new TargetPoint(worldObj.provider.dimensionId, xCoord, yCoord, zCoord, 50));
-			PacketDispatcher.wrapper.sendToAllAround(new AuxGaugePacket(xCoord, yCoord, zCoord, padSize.ordinal(), 1), new TargetPoint(worldObj.provider.dimensionId, xCoord, yCoord, zCoord, 250));
+			PacketDispatcher.wrapper.sendToAllAround(new BufPacket(xCoord, yCoord, zCoord, this), new TargetPoint(this.worldObj.provider.dimensionId, xCoord, yCoord, zCoord, 50));
 			
 			MissileStruct multipart = getStruct(slots[0]);
 			
@@ -240,6 +231,22 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 				}
 			}
 		}
+	}
+
+	@Override public void serialize(ByteBuf buf) {
+		buf.writeLong(power);
+		buf.writeInt(solid);
+		buf.writeByte((byte) padSize.ordinal());
+		tanks[0].serialize(buf);
+		tanks[1].serialize(buf);
+	}
+	
+	@Override public void deserialize(ByteBuf buf) {
+		this.power = buf.readLong();
+		this.solid = buf.readInt();
+		this.padSize = PartSize.values()[buf.readByte()];
+		tanks[0].deserialize(buf);
+		tanks[1].deserialize(buf);
 	}
 	
 	private void updateConnections() {
@@ -281,10 +288,17 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 	
 	public void launchFromDesignator() {
 
-		int tX = slots[1].stackTagCompound.getInteger("xCoord");
-		int tZ = slots[1].stackTagCompound.getInteger("zCoord");
-		
-		this.launchTo(tX, tZ);
+		if(slots[1] != null && slots[1].getItem() instanceof IDesignatorItem) {
+			IDesignatorItem designator = (IDesignatorItem) slots[1].getItem();
+			
+			if(designator.isReady(worldObj, slots[1], xCoord, yCoord, zCoord)) {
+				Vec3 coords = designator.getCoords(worldObj, slots[1], xCoord, yCoord, zCoord);
+				int tX = (int) Math.floor(coords.xCoord);
+				int tZ = (int) Math.floor(coords.zCoord);
+				
+				this.launchTo(tX, tZ);
+			}
+		}
 	}
 	
 	public void launchTo(int tX, int tZ) {
@@ -462,7 +476,7 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 		switch((FuelType)fuselage.attributes[0]) {
 			case KEROSENE:
 				tanks[0].setTankType(Fluids.KEROSENE);
-				tanks[1].setTankType(Fluids.ACID);
+				tanks[1].setTankType(Fluids.PEROXIDE);
 				break;
 			case HYDROGEN:
 				tanks[0].setTankType(Fluids.HYDROGEN);
@@ -473,7 +487,7 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 				break;
 			case BALEFIRE:
 				tanks[0].setTankType(Fluids.BALEFIRE);
-				tanks[1].setTankType(Fluids.ACID);
+				tanks[1].setTankType(Fluids.PEROXIDE);
 				break;
 			default: break;
 		}
@@ -537,46 +551,6 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 	@Override
 	public boolean canExtractItem(int i, ItemStack itemStack, int j) {
 		return false;
-	}
-
-	@Override
-	public int getMaxFluidFill(FluidType type) {
-		if (type.name().equals(tanks[0].getTankType().name()))
-			return tanks[0].getMaxFill();
-		else if (type.name().equals(tanks[1].getTankType().name()))
-			return tanks[1].getMaxFill();
-		else
-			return 0;
-	}
-
-	@Override
-	public void setFillForSync(int fill, int index) {
-		if (index < 2 && tanks[index] != null)
-			tanks[index].setFill(fill);
-	}
-
-	@Override
-	public void setFluidFill(int fill, FluidType type) {
-		if (type.name().equals(tanks[0].getTankType().name()))
-			tanks[0].setFill(fill);
-		else if (type.name().equals(tanks[1].getTankType().name()))
-			tanks[1].setFill(fill);
-	}
-
-	@Override
-	public void setTypeForSync(FluidType type, int index) {
-		if (index < 2 && tanks[index] != null)
-			tanks[index].setTankType(type);
-	}
-
-	@Override
-	public int getFluidFill(FluidType type) {
-		if (type.name().equals(tanks[0].getTankType().name()))
-			return tanks[0].getFill();
-		else if (type.name().equals(tanks[1].getTankType().name()))
-			return tanks[1].getFill();
-		else
-			return 0;
 	}
 	
 	@Override
@@ -643,8 +617,9 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 
 	// do some opencomputer stuff
 	@Override
+	@Optional.Method(modid = "OpenComputers")
 	public String getComponentName() {
-		return "large_launch_pad";
+		return "ntm_custom_launch_pad";
 	}
 
 	@Callback
@@ -656,7 +631,11 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 	@Callback
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] getContents(Context context, Arguments args) {
-		return new Object[] {tanks[0].getFill(), tanks[0].getMaxFill(), tanks[0].getTankType().getName(), tanks[1].getFill(), tanks[1].getMaxFill(), tanks[1].getTankType().getName(), solid, maxSolid};
+		return new Object[] {
+				tanks[0].getFill(), tanks[0].getMaxFill(), tanks[0].getTankType().getUnlocalizedName(),
+				tanks[1].getFill(), tanks[1].getMaxFill(), tanks[1].getTankType().getUnlocalizedName(),
+				solid, maxSolid
+		};
 	}
 
 	@Callback
@@ -676,13 +655,6 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 				zCoord2 = slots[1].stackTagCompound.getInteger("zCoord");
 			} else
 				return new Object[] {false};
-
-			// Not sure if i should have this
-			/*
-			if(xCoord2 == xCoord && zCoord2 == zCoord) {
-				xCoord2 += 1;
-			}
-			*/
 
 			return new Object[] {xCoord2, zCoord2};
 		}
@@ -704,10 +676,45 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 	@Callback
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] launch(Context context, Arguments args) {
-		//worldObj.getBlock(xCoord, yCoord, zCoord).explode(worldObj, xCoord, yCoord, zCoord);
-		((LaunchPad) ModBlocks.launch_pad).explode(worldObj, xCoord, yCoord, zCoord);
-		return new Object[] {};
+		if(this.canLaunch()) {
+			this.launchFromDesignator();
+			return new Object[] {true};
+		}
+		return new Object[] {false};
 	}
+
+	@Override
+	@Optional.Method(modid = "OpenComputers")
+	public String[] methods() {
+		return new String[] {
+				"getEnergyInfo",
+				"getContents",
+				"getLaunchInfo",
+				"getCoords",
+				"setCoords",
+				"launch"
+		};
+	}
+
+	@Override
+	@Optional.Method(modid = "OpenComputers")
+	public Object[] invoke(String method, Context context, Arguments args) throws Exception {
+		switch(method) {
+			case ("getEnergyInfo"):
+				return getEnergyInfo(context, args);
+			case ("getContents"):
+				return getContents(context, args);
+			case ("getLaunchInfo"):
+				return getLaunchInfo(context, args);
+			case ("getCoords"):
+				return getCoords(context, args);
+			case ("setCoords"):
+				return setCoords(context, args);
+			case ("launch"):
+				return launch(context, args);
+	}
+	throw new NoSuchMethodException();
+}
 
 	@Override
 	public Container provideContainer(int ID, EntityPlayer player, World world, int x, int y, int z) {
@@ -716,7 +723,7 @@ public class TileEntityLaunchTable extends TileEntityLoadedBase implements ISide
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIMachineLaunchTable(player.inventory, this);
 	}
 }

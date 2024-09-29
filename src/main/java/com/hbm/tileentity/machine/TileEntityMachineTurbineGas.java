@@ -3,6 +3,7 @@ package com.hbm.tileentity.machine;
 import java.util.HashMap;
 
 import com.hbm.blocks.BlockDummyable;
+import com.hbm.handler.CompatHandler;
 import com.hbm.handler.pollution.PollutionHandler;
 import com.hbm.handler.pollution.PollutionHandler.PollutionType;
 import com.hbm.interfaces.IControlReceiver;
@@ -17,11 +18,14 @@ import com.hbm.items.machine.IItemFluidIdentifier;
 import com.hbm.lib.Library;
 import com.hbm.main.MainRegistry;
 import com.hbm.sound.AudioWrapper;
+import com.hbm.tileentity.IFluidCopiable;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.TileEntityMachineBase;
+import com.hbm.util.CompatEnergyControl;
 
-import api.hbm.energy.IEnergyGenerator;
+import api.hbm.energymk2.IEnergyProviderMK2;
 import api.hbm.fluid.IFluidStandardTransceiver;
+import api.hbm.tile.IInfoProviderEC;
 import cpw.mods.fml.common.Optional;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -29,7 +33,6 @@ import li.cil.oc.api.machine.Arguments;
 import li.cil.oc.api.machine.Callback;
 import li.cil.oc.api.machine.Context;
 import li.cil.oc.api.network.SimpleComponent;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.nbt.NBTTagCompound;
@@ -39,7 +42,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
 @Optional.InterfaceList({@Optional.Interface(iface = "li.cil.oc.api.network.SimpleComponent", modid = "OpenComputers")})
-public class TileEntityMachineTurbineGas extends TileEntityMachineBase implements IFluidStandardTransceiver, IEnergyGenerator, IControlReceiver, IGUIProvider, SimpleComponent {
+public class TileEntityMachineTurbineGas extends TileEntityMachineBase implements IFluidStandardTransceiver, IEnergyProviderMK2, IControlReceiver, IGUIProvider, SimpleComponent, IInfoProviderEC, CompatHandler.OCComponent, IFluidCopiable {
 	
 	public long power;
 	public static final long maxPower = 1000000L;
@@ -68,7 +71,7 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 		fuelMaxCons.put(Fluids.GAS, 50D);			// natgas doesn't burn well so it burns faster to compensate
 		fuelMaxCons.put(Fluids.SYNGAS, 10D);		// syngas just fucks
 		fuelMaxCons.put(Fluids.OXYHYDROGEN, 100D);	// oxyhydrogen is terrible so it needs to burn a ton for the bare minimum
-		fuelMaxCons.put(Fluids.REFORMGAS, 2.5D);	// halved because it's too powerful
+		fuelMaxCons.put(Fluids.REFORMGAS, 5D);	// fuck it we ball
 		// default to 5 if not in list
 	}
 	
@@ -97,6 +100,19 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 				}
 			}
 			
+			if(autoMode) { //power production depending on power requirement
+				
+				//scales the slider proportionally to the power gauge
+				int powerSliderTarget = 60 - (int) (60 * power / maxPower);
+				
+				if(powerSliderTarget > powerSliderPos) { //makes the auto slider slide instead of snapping into position
+					powerSliderPos++;
+				}
+				else if(powerSliderTarget < powerSliderPos) {
+					powerSliderPos--;
+				}
+			}
+			
 			switch(state) { //what to do when turbine offline, starting up and online			
 			case 0:
 				shutdown();	
@@ -113,19 +129,6 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 				break;
 			}
 			
-			if(autoMode) { //power production depending on power requirement
-				
-				//scales the slider proportionally to the power gauge
-				int powerSliderTarget = 60 - (int) (60 * power / maxPower);
-				
-				if(powerSliderTarget > powerSliderPos) { //makes the auto slider slide instead of snapping into position
-					powerSliderPos++;
-				}
-				else if(powerSliderTarget < powerSliderPos) {
-					powerSliderPos--;
-				}
-			}
-			
 			ForgeDirection dir = ForgeDirection.getOrientation(this.getBlockMetadata() - BlockDummyable.offset);
 			ForgeDirection rot = dir.getRotation(ForgeDirection.UP);
 			
@@ -134,7 +137,7 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 			
 			//do net/battery deductions first...
 			power = Library.chargeItemsFromTE(slots, 0, power, maxPower);
-			this.sendPower(worldObj, xCoord - dir.offsetZ * 5, yCoord + 1, zCoord + dir.offsetX * 5, rot); //sends out power
+			this.tryProvide(worldObj, xCoord - dir.offsetZ * 5, yCoord + 1, zCoord + dir.offsetX * 5, rot); //sends out power
 			
 			//...and then cap it. Prevents potential future cases where power would be limited due to the fuel being too strong and the buffer too small.
 			if(this.power > this.maxPower)
@@ -176,12 +179,12 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 				
 				if(audio == null) { //if there is no sound playing, start it
 					
-					audio = MainRegistry.proxy.getLoopedSound("hbm:block.turbinegasRunning", xCoord, yCoord, zCoord, 1.0F, 20F, 2.0F);
+					audio = MainRegistry.proxy.getLoopedSound("hbm:block.turbinegasRunning", xCoord, yCoord, zCoord, getVolume(1.0F), 20F, 2.0F);
 					audio.startSound();
 					
 				} else if(!audio.isPlaying()) {
 					audio.stopSound();
-					audio = MainRegistry.proxy.getLoopedSound("hbm:block.turbinegasRunning", xCoord, yCoord, zCoord, 1.0F, 20F, 2.0F);
+					audio = MainRegistry.proxy.getLoopedSound("hbm:block.turbinegasRunning", xCoord, yCoord, zCoord, getVolume(1.0F), 20F, 2.0F);
 					audio.startSound();
 				}
 				
@@ -231,7 +234,7 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 		}
 		
 		if(counter == 50) {
-			worldObj.playSoundEffect(xCoord, yCoord + 2, zCoord, "hbm:block.turbinegasStartup", 1F, 1.0F);
+			worldObj.playSoundEffect(xCoord, yCoord + 2, zCoord, "hbm:block.turbinegasStartup", getVolume(1.0F), 1.0F);
 		}
 			
 		if(counter == 580) {
@@ -255,7 +258,7 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 			
 			if(counter == 225) {
 				
-				worldObj.playSoundEffect(xCoord, yCoord + 2, zCoord, "hbm:block.turbinegasShutdown", 1F, 1.0F);
+				worldObj.playSoundEffect(xCoord, yCoord + 2, zCoord, "hbm:block.turbinegasShutdown", getVolume(1.0F), 1.0F);
 				
 				rpmLast = rpm;
 				tempLast = temp;
@@ -554,6 +557,7 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 	}
 
 	@Override
+	@Optional.Method(modid = "OpenComputers")
 	public String getComponentName() {
 		return "ntm_gas_turbine";
 	}
@@ -602,41 +606,87 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 	@Callback(direct = true, limit = 4)
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] setThrottle(Context context, Arguments args) {
-		throttle = args.checkInteger(0);
-		return new Object[] {true};
+		powerSliderPos = (int) (args.checkInteger(0) * 60D / 100D);
+		return new Object[] {};
 	}
 
 	@Callback(direct = true, limit = 4)
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] setAuto(Context context, Arguments args) {
 		autoMode = args.checkBoolean(0);
-		return new Object[] {true};
+		return new Object[] {};
 	}
 
 	@Callback(direct = true, limit = 4)
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] start(Context context, Arguments args) {
-		stopIfNotReady();
-		startup();
-		return new Object[] {true};
+		state = -1;
+		return new Object[] {};
 	}
 
 	@Callback(direct = true, limit = 4)
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] stop(Context context, Arguments args) {
-		shutdown();
-		return new Object[] {true};
+		state = 0;
+		return new Object[] {};
 	}
 
 	@Callback(direct = true)
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] getInfo(Context context, Arguments args) {
-
 		return new Object[] {throttle, state,
 				tanks[0].getFill(), tanks[0].getMaxFill(),
 				tanks[1].getFill(), tanks[1].getMaxFill(),
 				tanks[2].getFill(), tanks[2].getMaxFill(),
 				tanks[3].getFill(), tanks[3].getMaxFill()};
+	}
+
+	@Override
+	@Optional.Method(modid = "OpenComputers")
+	public String[] methods() {
+		return new String[] {
+				"getFluid",
+				"getType",
+				"getPower",
+				"getThrottle",
+				"getState",
+				"getAuto",
+				"setThrottle",
+				"setAuto",
+				"start",
+				"stop",
+				"getInfo"
+		};
+	}
+
+	@Override
+	@Optional.Method(modid = "OpenComputers")
+	public Object[] invoke(String method, Context context, Arguments args) throws Exception {
+		switch(method) {
+			case ("getFluid"):
+				return getFluid(context, args);
+			case ("getType"):
+				return getType(context, args);
+			case ("getPower"):
+				return getPower(context, args);
+			case ("getThrottle"):
+				return getThrottle(context, args);
+			case ("getState"):
+				return getState(context, args);
+			case ("getAuto"):
+				return getAuto(context, args);
+			case ("setThrottle"):
+				return setThrottle(context, args);
+			case ("setAuto"):
+				return setAuto(context, args);
+			case ("start"):
+				return start(context, args);
+			case ("stop"):
+				return stop(context, args);
+			case ("getInfo"):
+				return getInfo(context, args);
+		}
+		throw new NoSuchMethodException();
 	}
 
 	@Override
@@ -646,7 +696,18 @@ public class TileEntityMachineTurbineGas extends TileEntityMachineBase implement
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIMachineTurbineGas(player.inventory, this);
+	}
+
+	@Override
+	public void provideExtraInfo(NBTTagCompound data) {
+		data.setBoolean(CompatEnergyControl.B_ACTIVE, this.state == 1);
+		data.setDouble(CompatEnergyControl.D_HEAT_C, Math.max(20D, this.temp));
+		data.setDouble(CompatEnergyControl.D_TURBINE_PERCENT, this.powerSliderPos * 100D / 60D);
+		data.setInteger(CompatEnergyControl.I_TURBINE_SPEED, this.rpm);
+		data.setDouble(CompatEnergyControl.D_OUTPUT_HE, this.instantPowerOutput);
+		data.setDouble(CompatEnergyControl.D_CONSUMPTION_MB, this.waterToBoil);
+		data.setDouble(CompatEnergyControl.D_OUTPUT_MB, this.waterToBoil * 10);
 	}
 }

@@ -6,7 +6,7 @@ import com.hbm.items.armor.ArmorFSB;
 import com.hbm.items.armor.ArmorFSBPowered;
 import com.hbm.util.BobMathUtil;
 
-import api.hbm.energy.IBatteryItem;
+import api.hbm.energymk2.IBatteryItem;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -33,7 +33,7 @@ public class ItemFusionCore extends Item {
 
 				if(st.getItem() instanceof IBatteryItem) {
 
-					long maxcharge = ((IBatteryItem) st.getItem()).getMaxCharge();
+					long maxcharge = ((IBatteryItem) st.getItem()).getMaxCharge(st);
 					long charge = ((IBatteryItem) st.getItem()).getCharge(st);
 					long newcharge = Math.min(charge + this.charge, maxcharge);
 

@@ -2,17 +2,19 @@ package com.hbm.tileentity.machine.storage;
 
 import api.hbm.fluid.*;
 import com.hbm.blocks.ModBlocks;
-import com.hbm.interfaces.IFluidAcceptor;
-import com.hbm.interfaces.IFluidSource;
+import com.hbm.handler.CompatHandler;
 import com.hbm.inventory.FluidContainerRegistry;
 import com.hbm.inventory.container.ContainerBarrel;
 import com.hbm.inventory.fluid.FluidType;
 import com.hbm.inventory.fluid.Fluids;
 import com.hbm.inventory.fluid.tank.FluidTank;
 import com.hbm.inventory.fluid.trait.FT_Corrosive;
+import com.hbm.inventory.fluid.trait.FT_Polluting;
+import com.hbm.inventory.fluid.trait.FluidTrait.FluidReleaseType;
 import com.hbm.inventory.gui.GUIBarrel;
 import com.hbm.lib.Library;
 import com.hbm.saveddata.TomSaveData;
+import com.hbm.tileentity.IFluidCopiable;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.IPersistentNBT;
 import com.hbm.tileentity.TileEntityMachineBase;
@@ -20,12 +22,12 @@ import com.hbm.util.fauxpointtwelve.DirPos;
 import cpw.mods.fml.common.Optional;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import io.netty.buffer.ByteBuf;
 import li.cil.oc.api.machine.Arguments;
 import li.cil.oc.api.machine.Callback;
 import li.cil.oc.api.machine.Context;
 import li.cil.oc.api.network.SimpleComponent;
 import net.minecraft.block.Block;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -41,24 +43,23 @@ import java.util.List;
 import java.util.Set;
 
 @Optional.InterfaceList({@Optional.Interface(iface = "li.cil.oc.api.network.SimpleComponent", modid = "opencomputers")})
-public class TileEntityBarrel extends TileEntityMachineBase implements IFluidAcceptor, IFluidSource, SimpleComponent, IFluidStandardTransceiver, IPersistentNBT, IGUIProvider {
+public class TileEntityBarrel extends TileEntityMachineBase implements SimpleComponent, IFluidStandardTransceiver, IPersistentNBT, IGUIProvider, CompatHandler.OCComponent, IFluidCopiable {
 	
 	public FluidTank tank;
 	public short mode = 0;
 	public static final short modes = 4;
 	public int age = 0;
-	public List<IFluidAcceptor> list = new ArrayList();
 	protected boolean sendingBrake = false;
 	public byte lastRedstone = 0;
 
 	public TileEntityBarrel() {
 		super(6);
-		tank = new FluidTank(Fluids.NONE, 0, 0);
+		tank = new FluidTank(Fluids.NONE, 0);
 	}
 
 	public TileEntityBarrel(int capacity) {
 		super(6);
-		tank = new FluidTank(Fluids.NONE, capacity, 0);
+		tank = new FluidTank(Fluids.NONE, capacity);
 	}
 
 	@Override
@@ -106,23 +107,31 @@ public class TileEntityBarrel extends TileEntityMachineBase implements IFluidAcc
 			tank.setType(0, 1, slots);
 			tank.loadTank(2, 3, slots);
 			tank.unloadTank(4, 5, slots);
-			tank.updateTank(xCoord, yCoord, zCoord, worldObj.provider.dimensionId);
 			
 			this.sendingBrake = true;
 			tank.setFill(transmitFluidFairly(worldObj, tank, this, tank.getFill(), this.mode == 0 || this.mode == 1, this.mode == 1 || this.mode == 2, getConPos()));
 			this.sendingBrake = false;
 			
-			if((mode == 1 || mode == 2) && (age == 9 || age == 19))
-				fillFluidInit(tank.getTankType());
-			
 			if(tank.getFill() > 0) {
 				checkFluidInteraction();
 			}
 			
-			NBTTagCompound data = new NBTTagCompound();
-			data.setShort("mode", mode);
-			this.networkPack(data, 50);
+			this.networkPackNT(50);
 		}
+	}
+
+	@Override
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeShort(mode);
+		tank.serialize(buf);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		mode = buf.readShort();
+		tank.deserialize(buf);
 	}
 	
 	protected DirPos[] getConPos() {
@@ -138,8 +147,8 @@ public class TileEntityBarrel extends TileEntityMachineBase implements IFluidAcc
 	
 	protected static int transmitFluidFairly(World world, FluidTank tank, IFluidConnector that, int fill, boolean connect, boolean send, DirPos[] connections) {
 		
-		Set<IPipeNet> nets = new HashSet();
-		Set<IFluidConnector> consumers = new HashSet();
+		Set<IPipeNet> nets = new HashSet<>();
+		Set<IFluidConnector> consumers = new HashSet<>();
 		FluidType type = tank.getTankType();
 		int pressure = tank.getPressure();
 		
@@ -164,13 +173,13 @@ public class TileEntityBarrel extends TileEntityMachineBase implements IFluidAcc
 		consumers.remove(that);
 
 		if(fill > 0 && send) {
-			List<IFluidConnector> con = new ArrayList();
+			List<IFluidConnector> con = new ArrayList<>();
 			con.addAll(consumers);
 
 			con.removeIf(x -> x == null || !(x instanceof TileEntity) || ((TileEntity)x).isInvalid());
 			
 			if(PipeNet.trackingInstances == null) {
-				PipeNet.trackingInstances = new ArrayList();
+				PipeNet.trackingInstances = new ArrayList<>();
 			}
 			
 			PipeNet.trackingInstances.clear();
@@ -247,7 +256,10 @@ public class TileEntityBarrel extends TileEntityMachineBase implements IFluidAcc
 		}
 		
 		if(b == ModBlocks.barrel_corroded ) {
-			if(worldObj.rand.nextInt(3) == 0) tank.setFill(tank.getFill() - 1);
+			if(worldObj.rand.nextInt(3) == 0) {
+				tank.setFill(tank.getFill() - 1);
+				FT_Polluting.pollute(worldObj, xCoord, yCoord, zCoord, tank.getTankType(), FluidReleaseType.SPILL, 1F);
+			}
 			if(worldObj.rand.nextInt(3 * 60 * 20) == 0) worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
 		}
 		
@@ -259,75 +271,6 @@ public class TileEntityBarrel extends TileEntityMachineBase implements IFluidAcc
 				worldObj.newExplosion(null, xCoord + 0.5, yCoord + 0.5, zCoord + 0.5, 5, true, true);
 			}
 		}
-	}
-	
-	public void networkUnpack(NBTTagCompound data) {
-		super.networkUnpack(data);
-		
-		mode = data.getShort("mode");
-	}
-
-	@Override
-	public void setFillForSync(int fill, int index) {
-		tank.setFill(fill);
-	}
-
-	@Override
-	public void setTypeForSync(FluidType type, int index) {
-		tank.setTankType(type);
-	}
-
-	@Override
-	public int getMaxFluidFill(FluidType type) {
-		
-		if(mode == 2 || mode == 3)
-			return 0;
-		
-		return type == this.tank.getTankType() ? tank.getMaxFill() : 0;
-	}
-
-	@Override
-	public void fillFluidInit(FluidType type) {
-		fillFluid(this.xCoord + 1, this.yCoord, this.zCoord, getTact(), type);
-		fillFluid(this.xCoord - 1, this.yCoord, this.zCoord, getTact(), type);
-		fillFluid(this.xCoord, this.yCoord + 1, this.zCoord, getTact(), type);
-		fillFluid(this.xCoord, this.yCoord - 1, this.zCoord, getTact(), type);
-		fillFluid(this.xCoord, this.yCoord, this.zCoord + 1, getTact(), type);
-		fillFluid(this.xCoord, this.yCoord, this.zCoord - 1, getTact(), type);
-	}
-
-	@Override
-	public void fillFluid(int x, int y, int z, boolean newTact, FluidType type) {
-		Library.transmitFluid(x, y, z, newTact, this, worldObj, type);
-	}
-
-	@Override
-	public boolean getTact() {
-		if (age >= 0 && age < 10) {
-			return true;
-		}
-
-		return false;
-	}
-
-	@Override
-	public int getFluidFill(FluidType type) {
-		return type == this.tank.getTankType() ? tank.getFill() : 0;
-	}
-
-	@Override
-	public void setFluidFill(int i, FluidType type) {
-		if(type == tank.getTankType()) tank.setFill(i);
-	}
-
-	@Override
-	public List<IFluidAcceptor> getFluidList(FluidType type) {
-		return this.list;
-	}
-
-	@Override
-	public void clearFluidList(FluidType type) {
-		this.list.clear();
 	}
 	
 	@Override
@@ -362,6 +305,16 @@ public class TileEntityBarrel extends TileEntityMachineBase implements IFluidAcc
 	}
 
 	@Override
+	public int[] getFluidIDToCopy() {
+		return new int[] {tank.getTankType().getID()};
+	}
+
+	@Override
+	public FluidTank getTankToPaste() {
+		return tank;
+	}
+
+	@Override
 	public void writeNBT(NBTTagCompound nbt) {
 		if(tank.getFill() == 0) return;
 		NBTTagCompound data = new NBTTagCompound();
@@ -384,11 +337,12 @@ public class TileEntityBarrel extends TileEntityMachineBase implements IFluidAcc
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIBarrel(player.inventory, this);
 	}
 
 	@Override
+	@Optional.Method(modid = "OpenComputers")
 	public String getComponentName() {
 		return "ntm_fluid_tank";
 	}
@@ -415,5 +369,32 @@ public class TileEntityBarrel extends TileEntityMachineBase implements IFluidAcc
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] getInfo(Context context, Arguments args) {
 		return new Object[]{tank.getFill(), tank.getMaxFill(), tank.getTankType().getName()};
+	}
+
+	@Override
+	@Optional.Method(modid = "OpenComputers")
+	public String[] methods() {
+		return new String[] {
+				"getFluidStored",
+				"getMaxStored",
+				"getTypeStored",
+				"getInfo"
+		};
+	}
+
+	@Override
+	@Optional.Method(modid = "OpenComputers")
+	public Object[] invoke(String method, Context context, Arguments args) throws Exception {
+		switch (method) {
+			case "getFluidStored":
+				return getFluidStored(context, args);
+			case "getMaxStored":
+				return getMaxStored(context, args);
+			case "getTypeStored":
+				return getTypeStored(context, args);
+			case "getInfo":
+				return getInfo(context, args);
+		}
+		throw new NoSuchMethodException();
 	}
 }

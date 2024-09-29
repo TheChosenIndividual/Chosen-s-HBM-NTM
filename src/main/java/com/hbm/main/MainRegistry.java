@@ -35,13 +35,12 @@ import com.hbm.items.ModItems;
 import com.hbm.items.tool.ItemFertilizer;
 import com.hbm.items.weapon.ItemGenericGrenade;
 import com.hbm.lib.HbmWorld;
-import com.hbm.lib.Library;
 import com.hbm.lib.RefStrings;
 import com.hbm.packet.PacketDispatcher;
 import com.hbm.potion.HbmPotion;
 import com.hbm.saveddata.satellites.Satellite;
 import com.hbm.tileentity.TileMappings;
-import com.hbm.tileentity.bomb.TileEntityLaunchPad;
+import com.hbm.tileentity.bomb.TileEntityLaunchPadBase;
 import com.hbm.tileentity.bomb.TileEntityNukeCustom;
 import com.hbm.tileentity.machine.TileEntityNukeFurnace;
 import com.hbm.tileentity.machine.rbmk.RBMKDials;
@@ -52,13 +51,10 @@ import com.hbm.world.feature.OreCave;
 import com.hbm.world.feature.OreLayer3D;
 import com.hbm.world.feature.SchistStratum;
 import com.hbm.world.generator.CellularDungeonFactory;
-import cpw.mods.fml.common.FMLCommonHandler;
-import cpw.mods.fml.common.Mod;
+import cpw.mods.fml.common.*;
 import cpw.mods.fml.common.Mod.EventHandler;
 import cpw.mods.fml.common.Mod.Instance;
 import cpw.mods.fml.common.Mod.Metadata;
-import cpw.mods.fml.common.ModMetadata;
-import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.*;
 import cpw.mods.fml.common.event.FMLInterModComms.IMCEvent;
 import cpw.mods.fml.common.event.FMLInterModComms.IMCMessage;
@@ -91,6 +87,7 @@ import net.minecraftforge.common.ForgeChunkManager.Ticket;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.util.EnumHelper;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -140,7 +137,6 @@ public class MainRegistry {
 	public static ToolMaterial enumToolMaterialMultitool = EnumHelper.addToolMaterial("MULTITOOL", 3, 5000, 25F, 5.5F, 25);
 
 	// Armor Materials
-	public static ArmorMaterial enumArmorMaterialEmerald = EnumHelper.addArmorMaterial("HBM_TEST", 2500, new int[] { 3, 8, 6, 3 }, 30);
 	public static ArmorMaterial aMatSchrab = EnumHelper.addArmorMaterial("HBM_SCHRABIDIUM", 100, new int[] { 3, 8, 6, 3 }, 50);
 	public static ArmorMaterial aMatEuph = EnumHelper.addArmorMaterial("HBM_EUPHEMIUM", 15000000, new int[] { 3, 8, 6, 3 }, 100);
 	public static ArmorMaterial aMatHaz = EnumHelper.addArmorMaterial("HBM_HAZMAT", 60, new int[] { 2, 5, 4, 1 }, 5);
@@ -250,6 +246,7 @@ public class MainRegistry {
 
 	@EventHandler
 	public void PreLoad(FMLPreInitializationEvent PreEvent) {
+		CrashHelper.init();
 		
 		startupTime = System.currentTimeMillis();
 		configDir = PreEvent.getModConfigurationDirectory();
@@ -268,6 +265,7 @@ public class MainRegistry {
 				polaroidID = rand.nextInt(18) + 1;
 		}
 
+		//ShadyUtil.test();
 		loadConfig(PreEvent);
 		HbmPotion.init();
 		
@@ -285,7 +283,6 @@ public class MainRegistry {
 		Satellite.register();
 		HTTPHandler.loadStats();
 		CraftingManager.mainRegistry();
-		AssemblerRecipes.preInit(PreEvent.getModConfigurationDirectory());
 		SiegeTier.registerTiers();
 		HazardRegistry.registerItems();
 		HazardRegistry.registerTrafos();
@@ -297,12 +294,12 @@ public class MainRegistry {
 		
 		if(WorldConfig.enableCraterBiomes) BiomeGenCraterBase.initDictionary();
 
-		Library.superuser.add("192af5d7-ed0f-48d8-bd89-9d41af8524f8");
+		/*Library.superuser.add("192af5d7-ed0f-48d8-bd89-9d41af8524f8");
 		Library.superuser.add("5aee1e3d-3767-4987-a222-e7ce1fbdf88e");
 		Library.superuser.add("937c9804-e11f-4ad2-a5b1-42e62ac73077");
 		Library.superuser.add("3af1c262-61c0-4b12-a4cb-424cc3a9c8c0");
 		Library.superuser.add("4729b498-a81c-42fd-8acd-20d6d9f759e0");
-		Library.superuser.add("c3f5e449-6d8c-4fe3-acc9-47ef50e7e7ae");
+		Library.superuser.add("c3f5e449-6d8c-4fe3-acc9-47ef50e7e7ae");*/
 
 		aMatSchrab.customCraftingMaterial = ModItems.ingot_schrabidium;
 		aMatHaz.customCraftingMaterial = ModItems.hazmat_cloth;
@@ -332,7 +329,7 @@ public class MainRegistry {
 		
 		TileMappings.writeMappings();
 		MachineDynConfig.initialize();
-		TileEntityLaunchPad.registerLaunchables();
+		TileEntityLaunchPadBase.registerLaunchables();
 		
 		for(Entry<Class<? extends TileEntity>, String[]> e : TileMappings.map.entrySet()) {
 			
@@ -357,6 +354,7 @@ public class MainRegistry {
 		ChestGenHooks.addItem(ChestGenHooks.BONUS_CHEST, new WeightedRandomChestContent(new ItemStack(ModItems.no9), 1, 1, 7));
 
 		EntityMappings.writeMappings();
+		//CompatNER.init();
 		
 		ForgeChunkManager.setForcedChunkLoadingCallback(this, new LoadingCallback() {
 
@@ -734,7 +732,7 @@ public class MainRegistry {
 		achZIRNOXBoom = new Achievement("achievement.ZIRNOXBoom", "ZIRNOXBoom", 14, -1, ModItems.debris_element, achCentrifuge).initIndependentStat().setSpecial().registerStat();
 		achChicagoPile = new Achievement("achievement.chicagoPile", "chicagoPile", 13, 0, ModItems.pile_rod_plutonium, achCentrifuge).initIndependentStat().registerStat();
 		achSILEX = new Achievement("achievement.SILEX", "SILEX", 12, 7, new ItemStack(ModBlocks.machine_silex), achAcidizer).initIndependentStat().registerStat();
-		achWatz = new Achievement("achievement.watz", "watz", 14, 3, ModItems.pellet_schrabidium, achSchrab).initIndependentStat().registerStat();
+		achWatz = new Achievement("achievement.watz", "watz", 14, 3, ModItems.watz_pellet, achSchrab).initIndependentStat().registerStat();
 		achWatzBoom = new Achievement("achievement.watzBoom", "watzBoom", 14, 5, ModItems.bucket_mud, achWatz).initIndependentStat().setSpecial().registerStat();
 		achRBMK = new Achievement("achievement.RBMK", "RBMK", 9, -5, ModItems.rbmk_fuel_ueu, achConcrete).initIndependentStat().registerStat();
 		achRBMKBoom = new Achievement("achievement.RBMKBoom", "RBMKBoom", 9, -7, ModItems.debris_fuel, achRBMK).initIndependentStat().setSpecial().registerStat();
@@ -821,6 +819,12 @@ public class MainRegistry {
 		IMCHandler.registerHandler("blastfurnace", new IMCBlastFurnace());
 		IMCHandler.registerHandler("crystallizer", new IMCCrystallizer());
 		IMCHandler.registerHandler("centrifuge", new IMCCentrifuge());
+
+		if (Loader.isModLoaded("NotEnoughItems")){
+			if (Loader.instance().getIndexedModList().get("NotEnoughItems").getVersion().contains("GTNH")) {
+				proxy.handleNHNEICompat();
+			}
+		}
 	}
 	
 	@EventHandler
@@ -843,11 +847,9 @@ public class MainRegistry {
 	@EventHandler
 	public static void PostLoad(FMLPostInitializationEvent PostEvent) {
 		TileEntityNukeFurnace.registerFuels();
-		AssemblerRecipes.loadRecipes();
 		MagicRecipes.register();
 		LemegetonRecipes.register();
 		SILEXRecipes.register();
-		AnvilRecipes.register();
 		RefineryRecipes.registerRefinery();
 		GasCentrifugeRecipes.register();
 		
@@ -856,11 +858,15 @@ public class MainRegistry {
 		//the good stuff
 		SerializableRecipe.registerAllHandlers();
 		SerializableRecipe.initialize();
+		
+		//Anvil has to come after serializables (i.e. anvil)
+		AnvilRecipes.register();
 
 		//has to register after cracking, and therefore after all serializable recipes
 		RadiolysisRecipes.registerRadiolysis();
 		
 		FalloutConfigJSON.initialize();
+		ItemPoolConfigJSON.initialize();
 
 		TileEntityNukeCustom.registerBombItems();
 		ArmorUtil.register();
@@ -872,7 +878,10 @@ public class MainRegistry {
 		proxy.registerMissileItems();
 		
 		BlockMotherOfAllOres.init();
-		
+
+		// Load compatibility for OC.
+		CompatHandler.init();
+
 		//expand for the largest entity we have (currently Quackos who is 17.5m in diameter, that's one fat duck)
 		World.MAX_ENTITY_RADIUS = Math.max(World.MAX_ENTITY_RADIUS, 8.75);
 
@@ -931,7 +940,6 @@ public class MainRegistry {
 	public void serverStart(FMLServerStartingEvent event) {
 		World world = event.getServer().getEntityWorld();
 		RBMKDials.createDials(world);
-		SiegeOrchestrator.createGameRules(world);
 		event.registerServerCommand(new CommandReloadRecipes());
 		event.registerServerCommand(new CommandDebugChunkLoad());
 		event.registerServerCommand(new CommandSatellites());
@@ -1223,6 +1231,199 @@ public class MainRegistry {
 		ignoreMappings.add("hbm:item.warhead_thermo_endo");
 		ignoreMappings.add("hbm:item.warhead_thermo_exo");
 		ignoreMappings.add("hbm:item.gun_dampfmaschine");
+		ignoreMappings.add("hbm:item.canteen_13");
+		ignoreMappings.add("hbm:tile.residue");
+		ignoreMappings.add("hbm:item.powder_cloud");
+		ignoreMappings.add("hbm:item.gun_detonator");
+		ignoreMappings.add("hbm:item.gun_avenger");
+		ignoreMappings.add("hbm:tile.block_cap_nuka");
+		ignoreMappings.add("hbm:tile.block_cap_quantum");
+		ignoreMappings.add("hbm:tile.block_cap_rad");
+		ignoreMappings.add("hbm:tile.block_cap_sparkle");
+		ignoreMappings.add("hbm:tile.block_cap_korl");
+		ignoreMappings.add("hbm:tile.block_cap_fritz");
+		ignoreMappings.add("hbm:tile.block_cap_sunset");
+		ignoreMappings.add("hbm:tile.block_cap_star");
+		ignoreMappings.add("hbm:tile.machine_deaerator");
+		ignoreMappings.add("hbm:item.bottle2_sunset");
+		ignoreMappings.add("hbm:item.cap_sunset");
+		ignoreMappings.add("hbm:item.cap_star");
+		ignoreMappings.add("hbm:tile.test_render");
+		ignoreMappings.add("hbm:tile.test_bomb");
+		ignoreMappings.add("hbm:tile.test_bomb_advanced");
+		ignoreMappings.add("hbm:tile.test_nuke");
+		ignoreMappings.add("hbm:tile.test_pipe");
+		ignoreMappings.add("hbm:tile.test_ct");
+		ignoreMappings.add("hbm:tile.test_rail");
+		ignoreMappings.add("hbm:tile.block_niter_reinforced");
+		ignoreMappings.add("hbm:tile.siege_shield");
+		ignoreMappings.add("hbm:tile.siege_internal");
+		ignoreMappings.add("hbm:tile.siege_circuit");
+		ignoreMappings.add("hbm:tile.siege_emergency");
+		ignoreMappings.add("hbm:tile.siege_hole");
+		ignoreMappings.add("hbm:tile.machine_shredder_large");
+		ignoreMappings.add("hbm:tile.turret_brandon");
+		ignoreMappings.add("hbm:item.bottle2_sunset");
+		ignoreMappings.add("hbm:item.pellet_schrabidium");
+		ignoreMappings.add("hbm:item.pellet_hes");
+		ignoreMappings.add("hbm:item.pellet_mes");
+		ignoreMappings.add("hbm:item.pellet_les");
+		ignoreMappings.add("hbm:item.pellet_beryllium");
+		ignoreMappings.add("hbm:item.pellet_neptunium");
+		ignoreMappings.add("hbm:item.pellet_lead");
+		ignoreMappings.add("hbm:item.pellet_advanced");
+		ignoreMappings.add("hbm:item.board_copper");
+		ignoreMappings.add("hbm:item.titanium_filter");
+		ignoreMappings.add("hbm:item.battery_steam");
+		ignoreMappings.add("hbm:item.battery_steam_large");
+		ignoreMappings.add("hbm:item.hull_small_steel");
+		ignoreMappings.add("hbm:item.hull_small_aluminium");
+		ignoreMappings.add("hbm:item.hull_big_steel");
+		ignoreMappings.add("hbm:item.hull_big_aluminium");
+		ignoreMappings.add("hbm:item.hull_big_titanium");
+		ignoreMappings.add("hbm:item.rod_zirnox_natural_uranium_fuel");
+		ignoreMappings.add("hbm:item.rod_zirnox_uranium_fuel");
+		ignoreMappings.add("hbm:item.rod_zirnox_th232");
+		ignoreMappings.add("hbm:item.rod_zirnox_thorium_fuel");
+		ignoreMappings.add("hbm:item.rod_zirnox_mox_fuel");
+		ignoreMappings.add("hbm:item.rod_zirnox_plutonium_fuel");
+		ignoreMappings.add("hbm:item.rod_zirnox_u233_fuel");
+		ignoreMappings.add("hbm:item.rod_zirnox_u235_fuel");
+		ignoreMappings.add("hbm:item.rod_zirnox_les_fuel");
+		ignoreMappings.add("hbm:item.rod_zirnox_lithium");
+		ignoreMappings.add("hbm:item.rod_zirnox_zfb_mox");
+		ignoreMappings.add("hbm:item.gas_petroleum");
+		ignoreMappings.add("hbm:item.gas_biogas");
+		ignoreMappings.add("hbm:item.gas_lpg");
+		ignoreMappings.add("hbm:item.gun_coilgun_ammo");
+		ignoreMappings.add("hbm:item.rotor_steel");
+		ignoreMappings.add("hbm:item.generator_steel");
+		ignoreMappings.add("hbm:item.bolt_compound");
+		ignoreMappings.add("hbm:tile.anvil_meteorite");
+		ignoreMappings.add("hbm:tile.anvil_starmetal");
+		ignoreMappings.add("hbm:tile.anvil_bismuth");
+		ignoreMappings.add("hbm:tile.lamp_uv_off");
+		ignoreMappings.add("hbm:tile.lamp_uv_on");
+		ignoreMappings.add("hbm:tile.ams_base");
+		ignoreMappings.add("hbm:tile.ams_emitter");
+		ignoreMappings.add("hbm:tile.ams_limiter");
+		ignoreMappings.add("hbm:tile.dummy_block_ams_limiter");
+		ignoreMappings.add("hbm:tile.dummy_port_ams_limiter");
+		ignoreMappings.add("hbm:tile.dummy_block_ams_emitter");
+		ignoreMappings.add("hbm:tile.dummy_port_ams_emitter");
+		ignoreMappings.add("hbm:tile.dummy_block_ams_base");
+		ignoreMappings.add("hbm:tile.dummy_port_ams_base");
+		ignoreMappings.add("hbm:tile.machine_selenium");
+		ignoreMappings.add("hbm:tile.fwatz_conductor");
+		ignoreMappings.add("hbm:tile.fwatz_cooler");
+		ignoreMappings.add("hbm:tile.fwatz_tank");
+		ignoreMappings.add("hbm:tile.fwatz_scaffold");
+		ignoreMappings.add("hbm:tile.fwatz_hatch");
+		ignoreMappings.add("hbm:tile.fwatz_computer");
+		ignoreMappings.add("hbm:tile.fwatz_core");
+		ignoreMappings.add("hbm:tile.fwatz_plasma");
+		ignoreMappings.add("hbm:tile.ore_meteor_uranium");
+		ignoreMappings.add("hbm:tile.ore_meteor_thorium");
+		ignoreMappings.add("hbm:tile.ore_meteor_titanium");
+		ignoreMappings.add("hbm:tile.ore_meteor_sulfur");
+		ignoreMappings.add("hbm:tile.ore_meteor_copper");
+		ignoreMappings.add("hbm:tile.ore_meteor_tungsten");
+		ignoreMappings.add("hbm:tile.ore_meteor_aluminium");
+		ignoreMappings.add("hbm:tile.ore_meteor_lead");
+		ignoreMappings.add("hbm:tile.ore_meteor_lithium");
+		ignoreMappings.add("hbm:tile.ore_meteor_starmetal");
+		ignoreMappings.add("hbm:tile.machine_generator");
+		ignoreMappings.add("hbm:item.v1");
+		ignoreMappings.add("hbm:item.arc_electrode_desh");
+		ignoreMappings.add("hbm:tile.sand_gold");
+		ignoreMappings.add("hbm:tile.sand_gold198");
+		ignoreMappings.add("hbm:tile.ore_weidanium");
+		ignoreMappings.add("hbm:tile.ore_reiium");
+		ignoreMappings.add("hbm:tile.ore_unobtainium");
+		ignoreMappings.add("hbm:tile.ore_daffergon");
+		ignoreMappings.add("hbm:tile.ore_verticium");
+		ignoreMappings.add("hbm:item.warhead_mirvlet");
+		ignoreMappings.add("hbm:item.generator_front");
+		ignoreMappings.add("hbm:tile.rbmk_heatex");
+		ignoreMappings.add("hbm:tile.machine_boiler_on");
+		ignoreMappings.add("hbm:tile.machine_boiler_electric_off");
+		ignoreMappings.add("hbm:tile.machine_boiler_electric_on");
+		ignoreMappings.add("hbm:tile.watz_control");
+		ignoreMappings.add("hbm:item.circuit_raw");
+		ignoreMappings.add("hbm:item.circuit_aluminium");
+		ignoreMappings.add("hbm:item.circuit_copper");
+		ignoreMappings.add("hbm:item.circuit_red_copper");
+		ignoreMappings.add("hbm:item.circuit_gold");
+		ignoreMappings.add("hbm:item.circuit_schrabidium");
+		ignoreMappings.add("hbm:item.circuit_bismuth_raw");
+		ignoreMappings.add("hbm:item.circuit_bismuth");
+		ignoreMappings.add("hbm:item.circuit_arsenic_raw");
+		ignoreMappings.add("hbm:item.circuit_arsenic");
+		ignoreMappings.add("hbm:item.circuit_tantalium_raw");
+		ignoreMappings.add("hbm:item.circuit_tantalium");
+		ignoreMappings.add("hbm:item.circuit_targeting_tier1");
+		ignoreMappings.add("hbm:item.circuit_targeting_tier2");
+		ignoreMappings.add("hbm:item.circuit_targeting_tier3");
+		ignoreMappings.add("hbm:item.circuit_targeting_tier4");
+		ignoreMappings.add("hbm:item.circuit_targeting_tier5");
+		ignoreMappings.add("hbm:item.circuit_targeting_tier6");
+		ignoreMappings.add("hbm:tile.fluid_duct");
+		ignoreMappings.add("hbm:tile.fluid_duct_solid");
+		ignoreMappings.add("hbm:item.void_anim");
+		ignoreMappings.add("hbm:item.pellet_mercury");
+		ignoreMappings.add("hbm:item.pellet_meteorite");
+		ignoreMappings.add("hbm:item.d_smoke1");
+		ignoreMappings.add("hbm:item.d_smoke2");
+		ignoreMappings.add("hbm:item.d_smoke3");
+		ignoreMappings.add("hbm:item.d_smoke4");
+		ignoreMappings.add("hbm:item.d_smoke5");
+		ignoreMappings.add("hbm:item.d_smoke6");
+		ignoreMappings.add("hbm:item.d_smoke7");
+		ignoreMappings.add("hbm:item.d_smoke8");
+		ignoreMappings.add("hbm:item.smoke1");
+		ignoreMappings.add("hbm:item.smoke2");
+		ignoreMappings.add("hbm:item.smoke3");
+		ignoreMappings.add("hbm:item.smoke4");
+		ignoreMappings.add("hbm:item.smoke5");
+		ignoreMappings.add("hbm:item.smoke6");
+		ignoreMappings.add("hbm:item.smoke7");
+		ignoreMappings.add("hbm:item.smoke8");
+		ignoreMappings.add("hbm:item.battery_su");
+		ignoreMappings.add("hbm:item.battery_su_l");
+		ignoreMappings.add("hbm:item.redstone_depleted");
+		ignoreMappings.add("hbm:item.euphemium_stopper");
+		ignoreMappings.add("hbm:item.energy_ball");
+		ignoreMappings.add("hbm:item.discharge");
+		ignoreMappings.add("hbm:item.empblast");
+		ignoreMappings.add("hbm:tile.crystal_power");
+		ignoreMappings.add("hbm:tile.crystal_energy");
+		ignoreMappings.add("hbm:tile.crystal_robust");
+		ignoreMappings.add("hbm:tile.crystal_trixite");
+		ignoreMappings.add("hbm:tile.hazmat");
+		ignoreMappings.add("hbm:item.pellet_coal");
+		ignoreMappings.add("hbm:item.test_helmet");
+		ignoreMappings.add("hbm:item.test_chestplate");
+		ignoreMappings.add("hbm:item.test_leggings");
+		ignoreMappings.add("hbm:item.test_boots");
+		ignoreMappings.add("hbm:item.cape_test");
+		ignoreMappings.add("hbm:item.spill1");
+		ignoreMappings.add("hbm:item.spill2");
+		ignoreMappings.add("hbm:item.spill3");
+		ignoreMappings.add("hbm:item.spill4");
+		ignoreMappings.add("hbm:item.spill5");
+		ignoreMappings.add("hbm:item.spill6");
+		ignoreMappings.add("hbm:item.spill7");
+		ignoreMappings.add("hbm:item.spill8");
+		ignoreMappings.add("hbm:item.gas1");
+		ignoreMappings.add("hbm:item.gas2");
+		ignoreMappings.add("hbm:item.gas3");
+		ignoreMappings.add("hbm:item.gas4");
+		ignoreMappings.add("hbm:item.gas5");
+		ignoreMappings.add("hbm:item.gas6");
+		ignoreMappings.add("hbm:item.gas7");
+		ignoreMappings.add("hbm:item.gas8");
+		ignoreMappings.add("hbm:tile.brick_forgotten");
+		ignoreMappings.add("hbm:tile.watz_conductor");
 		
 		/// REMAP ///
 		remapItems.put("hbm:item.gadget_explosive8", ModItems.early_explosive_lenses);

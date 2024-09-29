@@ -8,15 +8,16 @@ import com.hbm.handler.CasingEjector;
 import com.hbm.handler.GunConfiguration;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.items.ModItems;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.items.ItemAmmoEnums.AmmoGrenade;
 import com.hbm.lib.HbmCollection;
 import com.hbm.lib.HbmCollection.EnumGunManufacturer;
-import com.hbm.packet.AuxParticlePacketNT;
+import com.hbm.main.ResourceManager;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 import com.hbm.particle.SpentCasing;
 import com.hbm.particle.SpentCasing.CasingType;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
-
+import com.hbm.render.anim.HbmAnimations.AnimType;
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.MathHelper;
@@ -31,7 +32,7 @@ public class GunGrenadeFactory {
 	static {
 		EJECTOR_LAUNCHER = new CasingEjector().setAngleRange(0.02F, 0.03F).setAfterReload();
 		EJECTOR_CONGOLAKE = new CasingEjector().setMotion(0.3, 0.1, 0).setAngleRange(0.02F, 0.03F).setDelay(15);
-		CASING40MM = new SpentCasing(CasingType.STRAIGHT).setScale(4F, 4F, 3F).setBounceMotion(0.02F, 0.03F).setColor(0x777777).setupSmoke(1F, 0.5D, 60, 40);
+		CASING40MM = new SpentCasing(CasingType.STRAIGHT).setScale(4F, 4F, 3F).setBounceMotion(0.02F, 0.03F).setColor(SpentCasing.COLOR_CASE_40MM, 0x4B5443).setupSmoke(1F, 0.5D, 60, 40);
 	}
 	
 	public static GunConfiguration getHK69Config() {
@@ -69,11 +70,11 @@ public class GunGrenadeFactory {
 		
 		GunConfiguration config = new GunConfiguration();
 		
-		config.rateOfFire = 20;
+		config.rateOfFire = 24;
 		config.roundsPerCycle = 1;
 		config.gunMode = GunConfiguration.MODE_NORMAL;
 		config.firingMode = GunConfiguration.FIRE_MANUAL;
-		config.reloadDuration = 20;
+		config.reloadDuration = 16;
 		config.firingDuration = 0;
 		config.ammoCap = 4;
 		config.reloadType = GunConfiguration.RELOAD_SINGLE;
@@ -81,6 +82,7 @@ public class GunGrenadeFactory {
 		config.crosshair = Crosshair.L_CIRCUMFLEX;
 		config.firingSound = "hbm:weapon.glShoot";
 		config.reloadSound = GunConfiguration.RSOUND_GRENADE_NEW;
+		config.reloadSoundEnd = false;
 		
 		config.name = "congoLake";
 		config.manufacturer = EnumGunManufacturer.NAWS;
@@ -89,7 +91,18 @@ public class GunGrenadeFactory {
 		config.durability = 2500;
 		
 		config.ejector = EJECTOR_CONGOLAKE;
-		
+
+		config.reloadAnimationsSequential = true;
+
+		config.loadAnimations = i -> {
+			config.animations.put(AnimType.CYCLE, ResourceManager.congolake_anim.get("Fire"));
+			config.animations.put(AnimType.CYCLE_EMPTY, ResourceManager.congolake_anim.get("FireEmpty"));
+			config.animations.put(AnimType.RELOAD, ResourceManager.congolake_anim.get("ReloadStart"));
+			config.animations.put(AnimType.RELOAD_EMPTY, ResourceManager.congolake_anim.get("ReloadEmpty"));
+			config.animations.put(AnimType.RELOAD_CYCLE, ResourceManager.congolake_anim.get("Reload"));
+			config.animations.put(AnimType.RELOAD_END, ResourceManager.congolake_anim.get("ReloadEnd"));
+		};
+
 		return config;
 	}
 
@@ -193,7 +206,7 @@ public class GunGrenadeFactory {
 		bullet.explosive = 7.5F;
 		bullet.jolt = 6.5D;
 		
-		bullet.spentCasing = CASING40MM.clone().register("40MMIF");
+		bullet.spentCasing = CASING40MM.clone().register("40MMIF").setColor(SpentCasing.COLOR_CASE_40MM, 0x1C1C1C);
 		
 		return bullet;
 	}
@@ -210,7 +223,7 @@ public class GunGrenadeFactory {
 		bullet.explosive = 10.0F;
 		bullet.trail = 3;
 		
-		bullet.spentCasing = CASING40MM.clone().register("40MMCon");
+		bullet.spentCasing = CASING40MM.clone().register("40MMCon").setColor(SpentCasing.COLOR_CASE_40MM, 0x3D5E1D);
 		
 		return bullet;
 	}
@@ -224,7 +237,7 @@ public class GunGrenadeFactory {
 		bullet.explosive = 1.5F;
 		bullet.trail = 5;
 		
-		bullet.spentCasing = CASING40MM.clone().register("40MMFin");
+		bullet.spentCasing = CASING40MM.clone().register("40MMFin").setColor(SpentCasing.COLOR_CASE_40MM, 0x007FDB);
 		
 		return bullet;
 	}
@@ -241,7 +254,7 @@ public class GunGrenadeFactory {
 			BulletConfigFactory.nuclearExplosion(bulletnt, x, y, z, ExplosionNukeSmall.PARAMS_TOTS);
 		};
 		
-		bullet.spentCasing = CASING40MM.clone().register("40MMNuke");
+		bullet.spentCasing = CASING40MM.clone().register("40MMNuke").setColor(SpentCasing.COLOR_CASE_40MM, 0xE2C000);
 		
 		return bullet;
 	}
@@ -257,7 +270,7 @@ public class GunGrenadeFactory {
 		bullet.trail = 5;
 		bullet.vPFX = "bluedust";
 		
-		bullet.spentCasing = CASING40MM.clone().register("40MMTrac").setColor(0xEEEEEE);
+		bullet.spentCasing = CASING40MM.clone().register("40MMTrac").setColor(0xEEEEEE, 0x0075CA);
 		
 		return bullet;
 	}

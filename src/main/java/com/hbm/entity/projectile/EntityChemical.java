@@ -453,6 +453,18 @@ public class EntityChemical extends EntityThrowableNT {
 					if(core instanceof IRepairable) {
 						((IRepairable) core).tryExtinguish(worldObj, x, y, z, fext);
 					}
+					
+					if(fext == EnumExtinguishType.WATER && style == ChemicalStyle.LIQUID) {
+						for(int i = -2; i <= 2; i++) {
+							for(int j = 0; j <= 1; j++) {
+								for(int k = -2; k <= 2; k++) {
+									if(worldObj.getBlock(x + i, y + j, z + k) == ModBlocks.fallout) {
+										worldObj.setBlock(x + i, y + j, z + k, Blocks.air);
+									}
+								}
+							}
+						}
+					}
 				}
 				
 				Block block = worldObj.getBlock(x, y, z);
@@ -466,6 +478,7 @@ public class EntityChemical extends EntityThrowableNT {
 					int meta = worldObj.getBlockMetadata(x, y, z);
 					if(block == Blocks.cobblestone) worldObj.setBlock(x, y, z, Blocks.mossy_cobblestone);
 					if(block == Blocks.stonebrick && meta == 0) worldObj.setBlock(x, y, z, Blocks.stonebrick, 1, 3);
+					if(block == ModBlocks.waste_earth) worldObj.setBlock(x, y, z, Blocks.grass);
 					if(block == ModBlocks.brick_concrete) worldObj.setBlock(x, y, z, ModBlocks.brick_concrete_mossy);
 					if(block == ModBlocks.concrete_brick_slab && meta % 8 == 0) worldObj.setBlock(x, y, z, ModBlocks.concrete_brick_slab, meta + 1, 3);
 					if(block == ModBlocks.brick_concrete_stairs) worldObj.setBlock(x, y, z, ModBlocks.brick_concrete_mossy_stairs, meta, 3);

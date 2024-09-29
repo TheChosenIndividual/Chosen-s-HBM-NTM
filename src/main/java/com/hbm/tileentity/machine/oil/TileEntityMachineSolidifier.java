@@ -3,28 +3,28 @@ package com.hbm.tileentity.machine.oil;
 import java.util.List;
 
 import com.hbm.blocks.ModBlocks;
-import com.hbm.interfaces.IFluidAcceptor;
 import com.hbm.inventory.UpgradeManager;
 import com.hbm.inventory.container.ContainerSolidifier;
-import com.hbm.inventory.fluid.FluidType;
 import com.hbm.inventory.fluid.Fluids;
 import com.hbm.inventory.fluid.tank.FluidTank;
 import com.hbm.inventory.gui.GUISolidifier;
 import com.hbm.inventory.recipes.SolidificationRecipes;
 import com.hbm.items.machine.ItemMachineUpgrade.UpgradeType;
 import com.hbm.lib.Library;
+import com.hbm.tileentity.IFluidCopiable;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.IUpgradeInfoProvider;
 import com.hbm.tileentity.TileEntityMachineBase;
+import com.hbm.util.CompatEnergyControl;
 import com.hbm.util.I18nUtil;
 import com.hbm.util.Tuple.Pair;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidStandardReceiver;
+import api.hbm.tile.IInfoProviderEC;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -33,21 +33,21 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
-public class TileEntityMachineSolidifier extends TileEntityMachineBase implements IEnergyUser, IFluidAcceptor, IFluidStandardReceiver, IGUIProvider, IUpgradeInfoProvider {
+public class TileEntityMachineSolidifier extends TileEntityMachineBase implements IEnergyReceiverMK2, IFluidStandardReceiver, IGUIProvider, IUpgradeInfoProvider, IInfoProviderEC, IFluidCopiable {
 
 	public long power;
 	public static final long maxPower = 100000;
 	public static final int usageBase = 500;
 	public int usage;
 	public int progress;
-	public static final int processTimeBase = 200;
+	public static final int processTimeBase = 100;
 	public int processTime;
 	
 	public FluidTank tank;
 
 	public TileEntityMachineSolidifier() {
 		super(5);
-		tank = new FluidTank(Fluids.NONE, 24000, 0);
+		tank = new FluidTank(Fluids.NONE, 24_000);
 	}
 
 	@Override
@@ -61,7 +61,6 @@ public class TileEntityMachineSolidifier extends TileEntityMachineBase implement
 		if(!worldObj.isRemote) {
 			this.power = Library.chargeTEFromItems(slots, 1, power, maxPower);
 			tank.setType(4, slots);
-			tank.updateTank(this);
 
 			this.updateConnections();
 
@@ -82,6 +81,7 @@ public class TileEntityMachineSolidifier extends TileEntityMachineBase implement
 			data.setInteger("progress", this.progress);
 			data.setInteger("usage", this.usage);
 			data.setInteger("processTime", this.processTime);
+			tank.writeToNBT(data, "t");
 			this.networkPack(data, 50);
 		}
 	}
@@ -178,6 +178,7 @@ public class TileEntityMachineSolidifier extends TileEntityMachineBase implement
 		this.progress = nbt.getInteger("progress");
 		this.usage = nbt.getInteger("usage");
 		this.processTime = nbt.getInteger("processTime");
+		tank.readFromNBT(nbt, "t");
 	}
 	
 	@Override
@@ -205,32 +206,6 @@ public class TileEntityMachineSolidifier extends TileEntityMachineBase implement
 	@Override
 	public long getMaxPower() {
 		return maxPower;
-	}
-
-	@Override
-	public void setFillForSync(int fill, int index) {
-		tank.setFill(fill);
-	}
-
-	@Override
-	public void setFluidFill(int fill, FluidType type) {
-		if(type == tank.getTankType())
-			tank.setFill(fill);
-	}
-
-	@Override
-	public void setTypeForSync(FluidType type, int index) {
-		tank.setTankType(type);
-	}
-
-	@Override
-	public int getFluidFill(FluidType type) {
-		return tank.getTankType() == type ? tank.getFill() : 0;
-	}
-
-	@Override
-	public int getMaxFluidFill(FluidType type) {
-		return tank.getTankType() == type ? tank.getMaxFill() : 0;
 	}
 	
 	AxisAlignedBB bb = null;
@@ -275,7 +250,7 @@ public class TileEntityMachineSolidifier extends TileEntityMachineBase implement
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUISolidifier(player.inventory, this);
 	}
 
@@ -301,5 +276,16 @@ public class TileEntityMachineSolidifier extends TileEntityMachineBase implement
 		if(type == UpgradeType.SPEED) return 3;
 		if(type == UpgradeType.POWER) return 3;
 		return 0;
+	}
+
+	@Override
+	public void provideExtraInfo(NBTTagCompound data) {
+		data.setBoolean(CompatEnergyControl.B_ACTIVE, this.progress > 0);
+		data.setDouble(CompatEnergyControl.D_CONSUMPTION_HE, this.usage);
+	}
+
+	@Override
+	public FluidTank getTankToPaste() {
+		return tank;
 	}
 }

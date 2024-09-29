@@ -10,18 +10,15 @@ import org.lwjgl.opengl.GL11;
 import com.hbm.inventory.fluid.FluidType;
 import com.hbm.inventory.fluid.Fluids;
 import com.hbm.inventory.gui.GuiInfoContainer;
+import com.hbm.items.ModItems;
 import com.hbm.items.machine.IItemFluidIdentifier;
-import com.hbm.packet.PacketDispatcher;
-import com.hbm.packet.TEFluidPacket;
 
-import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
 
@@ -39,7 +36,6 @@ public class FluidTank {
 	FluidType type;
 	int fluid;
 	int maxFluid;
-	@Deprecated public int index = 0;
 	int pressure = 0;
 	
 	public FluidTank(FluidType type, int maxFluid) {
@@ -53,13 +49,6 @@ public class FluidTank {
 		
 		this.pressure = pressure;
 		return this;
-	}
-	
-	@Deprecated // indices are no longer needed
-	public FluidTank(FluidType type, int maxFluid, int index) {
-		this.type = type;
-		this.maxFluid = maxFluid;
-		this.index = index;
 	}
 	
 	public void setFill(int i) {
@@ -107,24 +96,15 @@ public class FluidTank {
 		return 0;
 	}
 	
-	//Called on TE update
-	@Deprecated public void updateTank(TileEntity te) {
-		updateTank(te, 100);
-	}
-	@Deprecated public void updateTank(TileEntity te, int range) {
-		updateTank(te.xCoord, te.yCoord, te.zCoord, te.getWorldObj().provider.dimensionId, range);
-	}
-	@Deprecated public void updateTank(int x, int y, int z, int dim) {
-		updateTank(x, y, z, dim, 100);
-	}
-	@Deprecated public void updateTank(int x, int y, int z, int dim, int range) {
-		PacketDispatcher.wrapper.sendToAllAround(new TEFluidPacket(x, y, z, fluid, index, type), new TargetPoint(dim, x, y, z, range));
-	}
-	
 	//Fills tank from canisters
 	public boolean loadTank(int in, int out, ItemStack[] slots) {
 		
 		if(slots[in] == null)
+			return false;
+
+		boolean isInfiniteBarrel = slots[in].getItem() == ModItems.fluid_barrel_infinite;
+
+		if(!isInfiniteBarrel && pressure != 0)
 			return false;
 		
 		int prev = this.getFill();
@@ -244,10 +224,10 @@ public class FluidTank {
 			maxX += i;
 			maxY += height;
 			
-			minV = 0;
+			minV = 0D;
 			maxV = height / 16D;
-			minU = 0D;
-			maxU = width / 16D;
+			minU = 1D;
+			maxU = 1D - i / 16D;
 		}
 		
 		Tessellator tessellator = Tessellator.instance;
@@ -295,7 +275,7 @@ public class FluidTank {
 		
 		fluid = MathHelper.clamp_int(fluid, 0, max);
 		
-		type = Fluids.fromName(nbt.getString(s + "_type")); //compat
+		type = Fluids.fromNameCompat(nbt.getString(s + "_type")); //compat
 		if(type == Fluids.NONE)
 			type = Fluids.fromID(nbt.getInteger(s + "_type"));
 		

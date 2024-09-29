@@ -16,15 +16,16 @@ import com.hbm.main.MainRegistry;
 import com.hbm.sound.AudioWrapper;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.TileEntityMachineBase;
+import com.hbm.util.BufferUtil;
 import com.hbm.util.ContaminationUtil;
 import com.hbm.util.ContaminationUtil.ContaminationType;
 import com.hbm.util.ContaminationUtil.HazardType;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.block.Block;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
@@ -41,7 +42,7 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityFEL extends TileEntityMachineBase implements IEnergyUser, IGUIProvider {
+public class TileEntityFEL extends TileEntityMachineBase implements IEnergyReceiverMK2, IGUIProvider {
 	
 	public long power;
 	public static final long maxPower = 20000000;
@@ -176,16 +177,10 @@ public class TileEntityFEL extends TileEntityMachineBase implements IEnergyUser,
 				}
 			}
 			
-			NBTTagCompound data = new NBTTagCompound();
-			data.setLong("power", power);
-			data.setString("mode", mode.toString());
-			data.setBoolean("isOn", isOn);
-			data.setBoolean("valid", missingValidSilex);
-			data.setInteger("distance", distance);
-			this.networkPack(data, 250);
+			this.networkPackNT(250);
 		} else {
 
-			if(isOn) {
+			if(power > powerReq * Math.pow(2, mode.ordinal()) && isOn && !(mode == EnumWavelengths.NULL) && distance - 3 > 0) {
 				audioDuration += 2;
 			} else {
 				audioDuration -= 3;
@@ -224,16 +219,25 @@ public class TileEntityFEL extends TileEntityMachineBase implements IEnergyUser,
 		 
 		return false;
 	}
-
+	
 	@Override
-	public void networkUnpack(NBTTagCompound nbt) {
-		super.networkUnpack(nbt);
-		
-		this.power = nbt.getLong("power");
-		this.mode = EnumWavelengths.valueOf(nbt.getString("mode"));
-		this.isOn = nbt.getBoolean("isOn");
-		this.distance = nbt.getInteger("distance");
-		this.missingValidSilex = nbt.getBoolean("valid");
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeLong(power);
+		BufferUtil.writeString(buf, mode.toString());
+		buf.writeBoolean(isOn);
+		buf.writeBoolean(missingValidSilex);
+		buf.writeInt(distance);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		power = buf.readLong();
+		mode = EnumWavelengths.valueOf(BufferUtil.readString(buf));
+		isOn = buf.readBoolean();
+		missingValidSilex = buf.readBoolean();
+		distance = buf.readInt();
 	}
 
 	@Override
@@ -308,7 +312,7 @@ public class TileEntityFEL extends TileEntityMachineBase implements IEnergyUser,
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIFEL(player.inventory, this);
 	}
 }

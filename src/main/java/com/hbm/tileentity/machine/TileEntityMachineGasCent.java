@@ -11,19 +11,22 @@ import com.hbm.inventory.recipes.GasCentrifugeRecipes.PseudoFluidType;
 import com.hbm.items.ModItems;
 import com.hbm.items.machine.IItemFluidIdentifier;
 import com.hbm.lib.Library;
-import com.hbm.packet.LoopedSoundPacket;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.LoopedSoundPacket;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.TileEntityMachineBase;
+import com.hbm.util.BufferUtil;
+import com.hbm.util.CompatEnergyControl;
 import com.hbm.util.InventoryUtil;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidStandardReceiver;
+import api.hbm.tile.IInfoProviderEC;
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -34,7 +37,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
 //epic!
-public class TileEntityMachineGasCent extends TileEntityMachineBase implements IEnergyUser, IFluidStandardReceiver, IGUIProvider {
+public class TileEntityMachineGasCent extends TileEntityMachineBase implements IEnergyReceiverMK2, IFluidStandardReceiver, IGUIProvider, IInfoProviderEC {
 	
 	public long power;
 	public int progress;
@@ -166,19 +169,6 @@ public class TileEntityMachineGasCent extends TileEntityMachineBase implements I
 		return false;
 	}
 	
-	public void networkUnpack(NBTTagCompound data) {
-		super.networkUnpack(data);
-		
-		this.power = data.getLong("power");
-		this.progress = data.getInteger("progress");
-		this.isProgressing = data.getBoolean("isProgressing");
-		this.inputTank.setTankType(PseudoFluidType.types.get(data.getString("inputType")));
-		this.outputTank.setTankType(PseudoFluidType.types.get(data.getString("outputType")));
-		this.inputTank.setFill(data.getInteger("inputFill"));
-		this.outputTank.setFill(data.getInteger("outputFill"));
-		this.tank.readFromNBT(data, "t");
-	}
-	
 	@Override
 	public void updateEntity() {
 		
@@ -232,19 +222,40 @@ public class TileEntityMachineGasCent extends TileEntityMachineBase implements I
 				}
 			}
 			
-			NBTTagCompound data = new NBTTagCompound();
-			data.setLong("power", power);
-			data.setInteger("progress", progress);
-			data.setBoolean("isProgressing", isProgressing);
-			data.setInteger("inputFill", inputTank.getFill());
-			data.setInteger("outputFill", outputTank.getFill());
-			data.setString("inputType", inputTank.getTankType().name);
-			data.setString("outputType", outputTank.getTankType().name);
-			tank.writeToNBT(data, "t");
-			this.networkPack(data, 50);
+			this.networkPackNT(50);
 
 			PacketDispatcher.wrapper.sendToAllAround(new LoopedSoundPacket(xCoord, yCoord, zCoord), new TargetPoint(worldObj.provider.dimensionId, xCoord, yCoord, zCoord, 50));
 		}
+	}
+	
+	@Override
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeLong(power);
+		buf.writeInt(progress);
+		buf.writeBoolean(isProgressing);
+		//pseudofluids can be refactored another day
+		buf.writeInt(inputTank.getFill());
+		buf.writeInt(outputTank.getFill());
+		BufferUtil.writeString(buf, inputTank.getTankType().name); //cough cough
+		BufferUtil.writeString(buf, outputTank.getTankType().name);
+		
+		tank.serialize(buf);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		power = buf.readLong();
+		progress = buf.readInt();
+		isProgressing = buf.readBoolean();
+		
+		inputTank.setFill(buf.readInt());
+		outputTank.setFill(buf.readInt());
+		inputTank.setTankType(PseudoFluidType.types.get(BufferUtil.readString(buf)));
+		outputTank.setTankType(PseudoFluidType.types.get(BufferUtil.readString(buf)));
+		
+		tank.deserialize(buf);
 	}
 	
 	private void updateConnections() {
@@ -449,7 +460,13 @@ public class TileEntityMachineGasCent extends TileEntityMachineBase implements I
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIMachineGasCent(player.inventory, this);
+	}
+
+	@Override
+	public void provideExtraInfo(NBTTagCompound data) {
+		data.setBoolean(CompatEnergyControl.B_ACTIVE, this.progress > 0);
+		data.setInteger(CompatEnergyControl.I_PROGRESS, this.progress);
 	}
 }

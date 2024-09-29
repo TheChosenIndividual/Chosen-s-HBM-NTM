@@ -1,23 +1,24 @@
 package com.hbm.tileentity.bomb;
 
+import java.util.List;
+
 import com.hbm.entity.missile.EntityMissileBaseNT;
 import com.hbm.items.weapon.ItemMissile;
 import com.hbm.items.weapon.ItemMissile.MissileFormFactor;
+import com.hbm.lib.Library;
 import com.hbm.main.MainRegistry;
 import com.hbm.sound.AudioWrapper;
-import com.hbm.tileentity.IGUIProvider;
-import com.hbm.tileentity.IRadarCommandReceiver;
+import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
-import api.hbm.fluid.IFluidStandardReceiver;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.Entity;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityLaunchPadLarge extends TileEntityLaunchPadBase implements IEnergyUser, IFluidStandardReceiver, IGUIProvider, IRadarCommandReceiver {
+public class TileEntityLaunchPadLarge extends TileEntityLaunchPadBase {
 
 	public int formFactor = -1;
 	/** Whether the missile has already been placed on the launchpad. Missile will render statically on the pad if true */
@@ -43,10 +44,8 @@ public class TileEntityLaunchPadLarge extends TileEntityLaunchPadBase implements
 	protected boolean liftMoving = false;
 	protected boolean erectorMoving = false;
 
-	@Override
-	public boolean isReadyForLaunch() {
-		return this.erected && this.readyToLoad;
-	}
+	@Override public boolean isReadyForLaunch() { return this.erected && this.readyToLoad; }
+	@Override public double getLaunchOffset() { return 2D; }
 
 	@Override
 	public void updateEntity() {
@@ -63,7 +62,6 @@ public class TileEntityLaunchPadLarge extends TileEntityLaunchPadBase implements
 				if(slots[0].getItem() instanceof ItemMissile) {
 					ItemMissile missile = (ItemMissile) slots[0].getItem();
 					this.formFactor = missile.formFactor.ordinal();
-					setFuel(missile);
 					
 					if(missile.formFactor == MissileFormFactor.ATLAS || missile.formFactor == MissileFormFactor.HUGE) {
 						erectorSpeed /= 2F;
@@ -80,64 +78,71 @@ public class TileEntityLaunchPadLarge extends TileEntityLaunchPadBase implements
 				delay = 20;
 			}
 			
-			if(delay > 0) {
-				delay--;
-				
-				if(delay < 10 && scheduleErect) {
-					this.erected = true;
-					this.scheduleErect = false;
-				}
-				
-				// if there is no missile or the missile isn't ready (i.e. the erector hasn't returned to zero position yet), retract
-				if(slots[0] == null || !readyToLoad) {
-					//fold back erector
-					if(erector < 90F) {
-						erector = Math.min(erector + erectorSpeed, 90F);
-						if(erector == 90F) delay = 20;
-					//extend lift
-					} else if(lift < 1F) {
-						lift = Math.min(lift + liftSpeed, 1F);
-						if(erector == 1F) {
-							//if the lift is fully extended, the loading can begin
-							readyToLoad = true;
-							delay = 20;
+			if(this.power >= 75_000) {
+				if(delay > 0) {
+					delay--;
+					
+					if(delay < 10 && scheduleErect) {
+						this.erected = true;
+						this.scheduleErect = false;
+					}
+					
+					// if there is no missile or the missile isn't ready (i.e. the erector hasn't returned to zero position yet), retract
+					if(slots[0] == null || !readyToLoad) {
+						//fold back erector
+						if(erector < 90F) {
+							erector = Math.min(erector + erectorSpeed, 90F);
+							if(erector == 90F) delay = 20;
+						//extend lift
+						} else if(lift < 1F) {
+							lift = Math.min(lift + liftSpeed, 1F);
+							if(erector == 1F) {
+								//if the lift is fully extended, the loading can begin
+								readyToLoad = true;
+								delay = 20;
+							}
 						}
 					}
-				}
-				
-			} else {
-				
-				//only extend if the erector isn't up yet and the missile can be loaded
-				if(!erected && readyToLoad) {
-					//first, rotate the erector
-					if(erector != 0F) {
-						erector = Math.max(erector - erectorSpeed, 0F);
-						if(erector == 0F) delay = 20;
-					//then retract the lift
-					} else if(lift > 0) {
-						lift = Math.max(lift - liftSpeed, 0F);
-						if(lift == 0F) {
-							//once the lift is at the bottom, the missile is deployed
-							scheduleErect = true;
-							delay = 20;
-						}
-					}
+					
 				} else {
-					//first, fold back the erector
-					if(erector < 90F) {
-						erector = Math.min(erector + erectorSpeed, 90F);
-						if(erector == 90F) delay = 20;
-					//then extend the lift again
-					} else if(lift < 1F) {
-						lift = Math.min(lift + liftSpeed, 1F);
-						if(erector == 1F) {
-							//if the lift is fully extended, the loading can begin
-							readyToLoad = true;
-							delay = 20;
+					
+					//only extend if the erector isn't up yet and the missile can be loaded
+					if(!erected && readyToLoad) {
+						this.state = this.STATE_LOADING;
+						
+						//first, rotate the erector
+						if(erector != 0F) {
+							erector = Math.max(erector - erectorSpeed, 0F);
+							if(erector == 0F) delay = 20;
+						//then retract the lift
+						} else if(lift > 0) {
+							lift = Math.max(lift - liftSpeed, 0F);
+							if(lift == 0F) {
+								//once the lift is at the bottom, the missile is deployed
+								scheduleErect = true;
+								delay = 20;
+							}
+						}
+					} else {
+						//first, fold back the erector
+						if(erector < 90F) {
+							erector = Math.min(erector + erectorSpeed, 90F);
+							if(erector == 90F) delay = 20;
+						//then extend the lift again
+						} else if(lift < 1F) {
+							lift = Math.min(lift + liftSpeed, 1F);
+							if(erector == 1F) {
+								//if the lift is fully extended, the loading can begin
+								readyToLoad = true;
+								delay = 20;
+							}
 						}
 					}
 				}
 			}
+			
+			if(!this.hasFuel() || !this.isMissileValid()) this.state = this.STATE_MISSING;
+			if(this.erected && this.canLaunch()) this.state = this.STATE_READY;
 
 			boolean prevLiftMoving = this.liftMoving;
 			boolean prevErectorMoving = this.erectorMoving;
@@ -185,6 +190,36 @@ public class TileEntityLaunchPadLarge extends TileEntityLaunchPadBase implements
 				if(this.audioErector != null) {
 					this.audioErector.stopSound();
 					this.audioErector = null;
+				}
+			}
+			
+			if(this.erected && (this.formFactor == MissileFormFactor.HUGE.ordinal() || this.formFactor == MissileFormFactor.ATLAS.ordinal()) && this.tanks[1].getFill() > 0) {
+				NBTTagCompound data = new NBTTagCompound();
+				data.setString("type", "tower");
+				data.setFloat("lift", 0F);
+				data.setFloat("base", 0.5F);
+				data.setFloat("max", 2F);
+				data.setInteger("life", 70 + worldObj.rand.nextInt(30));
+				data.setDouble("posX", xCoord + 0.5 + worldObj.rand.nextGaussian() * 0.5);
+				data.setDouble("posZ", zCoord + 0.5 + worldObj.rand.nextGaussian() * 0.5);
+				data.setDouble("posY", yCoord + 2);
+				data.setBoolean("noWind", true);
+				data.setFloat("alphaMod", 2F);
+				data.setFloat("strafe", 0.05F);
+				for(int i = 0; i < 3; i++) MainRegistry.proxy.effectNT(data);
+			}
+			
+			List<EntityMissileBaseNT> entities = worldObj.getEntitiesWithinAABB(EntityMissileBaseNT.class, AxisAlignedBB.getBoundingBox(xCoord - 0.5, yCoord, zCoord - 0.5, xCoord + 1.5, yCoord + 10, zCoord + 1.5));
+			
+			if(!entities.isEmpty()) {
+				for(int i = 0; i < 15; i++) {
+
+					ForgeDirection dir = ForgeDirection.getOrientation(this.getBlockMetadata() - 10);
+					if(worldObj.rand.nextBoolean()) dir = dir.getOpposite();
+					float moX = (float) (worldObj.rand.nextGaussian() * 0.15F + 0.75) * dir.offsetX;
+					float moZ = (float) (worldObj.rand.nextGaussian() * 0.15F + 0.75) * dir.offsetZ;
+					
+					MainRegistry.proxy.spawnParticle(xCoord + 0.5, yCoord + 0.25, zCoord + 0.5, "launchsmoke", new float[] {moX, 0, moZ});
 				}
 			}
 		}
@@ -243,16 +278,25 @@ public class TileEntityLaunchPadLarge extends TileEntityLaunchPadBase implements
 		nbt.setFloat("erector", erector);
 		nbt.setInteger("formFactor", formFactor);
 	}
+
+	@Override
+	public void finalizeLaunch(Entity missile) {
+		super.finalizeLaunch(missile);
+		this.erected = false;
+	}
 	
-	public Entity instantiateMissile(int targetX, int targetZ) {
-		Entity missile = super.instantiateMissile(targetX, targetZ);
-		
-		if(missile instanceof EntityMissileBaseNT) {
-			EntityMissileBaseNT base = (EntityMissileBaseNT) missile;
-			base.getDataWatcher().updateObject(3, (byte) (this.getBlockMetadata() - 10));
-		}
-		
-		return missile;
+	@Override
+	public DirPos[] getConPos() {
+		return new DirPos[] {
+				new DirPos(xCoord + 5, yCoord, zCoord - 2, Library.POS_X),
+				new DirPos(xCoord + 5, yCoord, zCoord + 2, Library.POS_X),
+				new DirPos(xCoord - 5, yCoord, zCoord - 2, Library.NEG_X),
+				new DirPos(xCoord - 5, yCoord, zCoord + 2, Library.NEG_X),
+				new DirPos(xCoord - 2, yCoord, zCoord + 5, Library.POS_Z),
+				new DirPos(xCoord + 2, yCoord, zCoord + 5, Library.POS_Z),
+				new DirPos(xCoord - 2, yCoord, zCoord - 5, Library.NEG_Z),
+				new DirPos(xCoord + 2, yCoord, zCoord - 5, Library.NEG_Z)
+		};
 	}
 	
 	AxisAlignedBB bb = null;

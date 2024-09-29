@@ -3,18 +3,17 @@ package com.hbm.tileentity.network;
 import com.hbm.blocks.ModBlocks;
 import com.hbm.blocks.network.CraneInserter;
 import com.hbm.entity.item.EntityMovingItem;
-import com.hbm.interfaces.IControlReceiver;
 import com.hbm.inventory.container.ContainerCraneGrabber;
 import com.hbm.inventory.gui.GUICraneGrabber;
 import com.hbm.items.ModItems;
 import com.hbm.module.ModulePatternMatcher;
+import com.hbm.tileentity.IControlReceiverFilter;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.util.InventoryUtil;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.block.Block;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IInventory;
@@ -29,16 +28,18 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 import java.util.List;
 
-public class TileEntityCraneGrabber extends TileEntityCraneBase implements IGUIProvider, IControlReceiver {
+public class TileEntityCraneGrabber extends TileEntityCraneBase implements IGUIProvider, IControlReceiverFilter {
 
 	public boolean isWhitelist = false;
 	public ModulePatternMatcher matcher;
+	public long lastGrabbedTick = 0;
 
 	public TileEntityCraneGrabber() {
 		super(11);
 		this.matcher = new ModulePatternMatcher(9);
 	}
-	
+
+	@Override
 	public void nextMode(int i) {
 		this.matcher.nextMode(worldObj, slots[i], i);
 	}
@@ -63,7 +64,7 @@ public class TileEntityCraneGrabber extends TileEntityCraneBase implements IGUIP
 				}
 			}
 			
-			if(worldObj.getTotalWorldTime() % delay == 0 && !this.worldObj.isBlockIndirectlyGettingPowered(xCoord, yCoord, zCoord)) {
+			if(worldObj.getTotalWorldTime() >= lastGrabbedTick + delay && !this.worldObj.isBlockIndirectlyGettingPowered(xCoord, yCoord, zCoord)) {
 				int amount = 1;
 				
 				if(slots[9] != null && slots[9].getItem() == ModItems.upgrade_stack) {
@@ -111,6 +112,8 @@ public class TileEntityCraneGrabber extends TileEntityCraneBase implements IGUIP
 						boolean match = this.matchesFilter(stack);
 						if(this.isWhitelist && !match || !this.isWhitelist && match) continue;
 						
+						lastGrabbedTick = worldObj.getTotalWorldTime();
+						
 						ItemStack copy = stack.copy();
 						int toAdd = Math.min(stack.stackSize, amount);
 						copy.stackSize = toAdd;
@@ -140,9 +143,8 @@ public class TileEntityCraneGrabber extends TileEntityCraneBase implements IGUIP
 	
 	public void networkUnpack(NBTTagCompound nbt) {
 		super.networkUnpack(nbt);
-		
 		this.isWhitelist = nbt.getBoolean("isWhitelist");
-		this.matcher.modes = new String[this.matcher.modes.length];
+		this.matcher.modes = new String[matcher.modes.length];
 		this.matcher.readFromNBT(nbt);
 	}
 	
@@ -166,7 +168,7 @@ public class TileEntityCraneGrabber extends TileEntityCraneBase implements IGUIP
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUICraneGrabber(player.inventory, this);
 	}
 	
@@ -175,6 +177,7 @@ public class TileEntityCraneGrabber extends TileEntityCraneBase implements IGUIP
 		super.readFromNBT(nbt);
 		this.isWhitelist = nbt.getBoolean("isWhitelist");
 		this.matcher.readFromNBT(nbt);
+		this.lastGrabbedTick = nbt.getLong("lastGrabbedTick");
 	}
 	
 	@Override
@@ -182,6 +185,7 @@ public class TileEntityCraneGrabber extends TileEntityCraneBase implements IGUIP
 		super.writeToNBT(nbt);
 		nbt.setBoolean("isWhitelist", this.isWhitelist);
 		this.matcher.writeToNBT(nbt);
+		nbt.setLong("lastGrabbedTick", lastGrabbedTick);
 	}
 
 	@Override
@@ -190,9 +194,17 @@ public class TileEntityCraneGrabber extends TileEntityCraneBase implements IGUIP
 	}
 
 	@Override
+	public int[] getFilterSlots() {
+		return new int[]{0,9};
+	}
+
+	@Override
 	public void receiveControl(NBTTagCompound data) {
 		if(data.hasKey("whitelist")) {
 			this.isWhitelist = !this.isWhitelist;
+		}
+		if(data.hasKey("slot")){
+			setFilterContents(data);
 		}
 	}
 }

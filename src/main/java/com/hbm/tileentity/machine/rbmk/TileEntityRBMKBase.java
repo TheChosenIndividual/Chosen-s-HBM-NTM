@@ -9,9 +9,9 @@ import com.hbm.entity.effect.EntitySpear;
 import com.hbm.entity.projectile.EntityRBMKDebris;
 import com.hbm.entity.projectile.EntityRBMKDebris.DebrisType;
 import com.hbm.main.MainRegistry;
-import com.hbm.packet.AuxParticlePacketNT;
-import com.hbm.packet.NBTPacket;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
+import com.hbm.packet.toclient.NBTPacket;
 import com.hbm.saveddata.TomSaveData;
 import com.hbm.tileentity.INBTPacketReceiver;
 import com.hbm.tileentity.IOverpressurable;
@@ -128,7 +128,7 @@ public abstract class TileEntityRBMKBase extends TileEntityLoadedBase implements
 		double availableWater = this.water;
 		double availableSpace = this.maxSteam - this.steam;
 		
-		int processedWater = (int)Math.floor(Math.min(availableHeat, Math.min(availableWater, availableSpace)) * RBMKDials.getReaSimBoilerSpeed(worldObj));
+		int processedWater = (int) Math.floor(Math.min(availableHeat, Math.min(availableWater, availableSpace)) * RBMKDials.getReaSimBoilerSpeed(worldObj));
 		
 		this.water -= processedWater;
 		this.steam += processedWater;

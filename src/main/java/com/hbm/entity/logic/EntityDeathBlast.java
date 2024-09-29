@@ -2,8 +2,8 @@ package com.hbm.entity.logic;
 
 import com.hbm.entity.projectile.EntityBulletBaseNT;
 import com.hbm.handler.BulletConfigSyncingUtil;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import cpw.mods.fml.relauncher.Side;
@@ -37,7 +37,7 @@ public class EntityDeathBlast extends Entity {
 		if(this.ticksExisted >= maxAge && !worldObj.isRemote) {
 			this.setDead();
 			
-			worldObj.spawnEntityInWorld(EntityNukeExplosionMK5.statFacNoRad(worldObj, 40, posX, posY, posZ).mute());
+			worldObj.spawnEntityInWorld(EntityNukeExplosionMK5.statFacNoRad(worldObj, 40, posX, posY, posZ));
 			
 			int count = 100;
 			for(int i = 0; i < count; i++) {

@@ -12,6 +12,7 @@ import com.hbm.inventory.fluid.tank.FluidTank;
 import com.hbm.inventory.gui.GUIAssemfac;
 import com.hbm.items.machine.ItemMachineUpgrade;
 import com.hbm.items.machine.ItemMachineUpgrade.UpgradeType;
+import com.hbm.tileentity.IFluidCopiable;
 import com.hbm.tileentity.IUpgradeInfoProvider;
 import com.hbm.util.BobMathUtil;
 import com.hbm.util.I18nUtil;
@@ -20,7 +21,7 @@ import com.hbm.util.fauxpointtwelve.DirPos;
 import api.hbm.fluid.IFluidStandardTransceiver;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -30,7 +31,7 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityMachineAssemfac extends TileEntityMachineAssemblerBase implements IFluidStandardTransceiver, IUpgradeInfoProvider {
+public class TileEntityMachineAssemfac extends TileEntityMachineAssemblerBase implements IFluidStandardTransceiver, IUpgradeInfoProvider, IFluidCopiable {
 	
 	public AssemblerArm[] arms;
 
@@ -93,16 +94,7 @@ public class TileEntityMachineAssemfac extends TileEntityMachineAssemblerBase im
 				this.sendFluid(steam, worldObj, pos.getX(), pos.getY(), pos.getZ(), pos.getDir());
 			}
 			
-			NBTTagCompound data = new NBTTagCompound();
-			data.setLong("power", this.power);
-			data.setIntArray("progress", this.progress);
-			data.setIntArray("maxProgress", this.maxProgress);
-			data.setBoolean("isProgressing", isProgressing);
-			
-			water.writeToNBT(data, "w");
-			steam.writeToNBT(data, "s");
-			
-			this.networkPack(data, 150);
+			this.networkPackNT(150);
 			
 		} else {
 			
@@ -114,7 +106,33 @@ public class TileEntityMachineAssemfac extends TileEntityMachineAssemblerBase im
 			}
 		}
 	}
-
+	
+	@Override
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeLong(power);
+		for(int i = 0; i < getRecipeCount(); i++) {
+			buf.writeInt(progress[i]);
+			buf.writeInt(maxProgress[i]);
+		}
+		buf.writeBoolean(isProgressing);
+		water.serialize(buf);
+		steam.serialize(buf);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		power = buf.readLong();
+		for(int i = 0; i < getRecipeCount(); i++) {
+			progress[i] = buf.readInt();
+			maxProgress[i] = buf.readInt();
+		}
+		isProgressing = buf.readBoolean();
+		water.deserialize(buf);
+		steam.deserialize(buf);
+	}
+	
 	@Override
 	public void networkUnpack(NBTTagCompound nbt) {
 		super.networkUnpack(nbt);
@@ -426,7 +444,7 @@ public class TileEntityMachineAssemfac extends TileEntityMachineAssemblerBase im
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIAssemfac(player.inventory, this);
 	}
 
@@ -457,5 +475,10 @@ public class TileEntityMachineAssemfac extends TileEntityMachineAssemblerBase im
 		if(type == UpgradeType.POWER) return 3;
 		if(type == UpgradeType.OVERDRIVE) return 12;
 		return 0;
+	}
+
+	@Override
+	public FluidTank getTankToPaste() {
+		return null;
 	}
 }

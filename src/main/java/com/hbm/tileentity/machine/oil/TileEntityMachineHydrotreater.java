@@ -9,18 +9,18 @@ import com.hbm.inventory.gui.GUIMachineHydrotreater;
 import com.hbm.inventory.recipes.HydrotreatingRecipes;
 import com.hbm.items.ModItems;
 import com.hbm.lib.Library;
+import com.hbm.tileentity.IFluidCopiable;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.IPersistentNBT;
 import com.hbm.tileentity.TileEntityMachineBase;
 import com.hbm.util.Tuple.Triplet;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidStandardTransceiver;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.nbt.NBTTagCompound;
@@ -28,7 +28,7 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityMachineHydrotreater extends TileEntityMachineBase implements IEnergyUser, IFluidStandardTransceiver, IPersistentNBT, IGUIProvider {
+public class TileEntityMachineHydrotreater extends TileEntityMachineBase implements IEnergyReceiverMK2, IFluidStandardTransceiver, IPersistentNBT, IGUIProvider, IFluidCopiable {
 	
 	public long power;
 	public static final long maxPower = 1_000_000;
@@ -41,7 +41,7 @@ public class TileEntityMachineHydrotreater extends TileEntityMachineBase impleme
 		this.tanks = new FluidTank[4];
 		this.tanks[0] = new FluidTank(Fluids.OIL, 64_000);
 		this.tanks[1] = new FluidTank(Fluids.HYDROGEN, 64_000).withPressure(1);
-		this.tanks[2] = new FluidTank(Fluids.NONE, 24_000);
+		this.tanks[2] = new FluidTank(Fluids.OIL_DS, 24_000);
 		this.tanks[3] = new FluidTank(Fluids.SOURGAS, 24_000);
 	}
 
@@ -82,12 +82,14 @@ public class TileEntityMachineHydrotreater extends TileEntityMachineBase impleme
 	@Override
 	public void serialize(ByteBuf buf) {
 		super.serialize(buf);
+		buf.writeLong(power);
 		for(int i = 0; i < 4; i++) tanks[i].serialize(buf);
 	}
 	
 	@Override
 	public void deserialize(ByteBuf buf) {
 		super.deserialize(buf);
+		this.power = buf.readLong();
 		for(int i = 0; i < 4; i++) tanks[i].deserialize(buf);
 	}
 	
@@ -105,14 +107,14 @@ public class TileEntityMachineHydrotreater extends TileEntityMachineBase impleme
 		tanks[3].setTankType(out.getZ().type);
 		
 		if(power < 20_000) return;
-		if(tanks[0].getFill() < 50) return;
+		if(tanks[0].getFill() < 100) return;
 		if(tanks[1].getFill() < out.getX().fill) return;
 		if(slots[10] == null || slots[10].getItem() != ModItems.catalytic_converter) return;
 
 		if(tanks[2].getFill() + out.getY().fill > tanks[2].getMaxFill()) return;
 		if(tanks[3].getFill() + out.getZ().fill > tanks[3].getMaxFill()) return;
 
-		tanks[0].setFill(tanks[0].getFill() - 50);
+		tanks[0].setFill(tanks[0].getFill() - 100);
 		tanks[1].setFill(tanks[1].getFill() - out.getX().fill);
 		tanks[2].setFill(tanks[2].getFill() + out.getY().fill);
 		tanks[3].setFill(tanks[3].getFill() + out.getZ().fill);
@@ -217,7 +219,12 @@ public class TileEntityMachineHydrotreater extends TileEntityMachineBase impleme
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIMachineHydrotreater(player.inventory, this);
+	}
+
+	@Override
+	public FluidTank getTankToPaste() {
+		return tanks[0];
 	}
 }

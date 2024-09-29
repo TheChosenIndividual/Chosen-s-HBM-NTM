@@ -7,10 +7,8 @@ import com.hbm.tileentity.IGUIProvider;
 import cpw.mods.fml.common.network.internal.FMLNetworkHandler;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.block.Block;
 import net.minecraft.block.BlockContainer;
 import net.minecraft.block.material.Material;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityItem;
@@ -22,6 +20,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
+import net.minecraft.stats.StatList;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.MathHelper;
@@ -71,20 +70,28 @@ public class BlockBobble extends BlockContainer implements IGUIProvider {
 	}
 
 	@Override
-	public void breakBlock(World world, int x, int y, int z, Block block, int meta) {
+	public void onBlockHarvested(World world, int x, int y, int z, int meta, EntityPlayer player) {
 		
-		if(!world.isRemote) {
-			TileEntityBobble entity = (TileEntityBobble) world.getTileEntity(x, y, z);
-			if(entity != null) {
-				EntityItem item = new EntityItem(world, x + 0.5, y, z + 0.5, new ItemStack(this, 1, entity.type.ordinal()));
-				item.motionX = 0;
-				item.motionY = 0;
-				item.motionZ = 0;
-				world.spawnEntityInWorld(item);
+		if(!player.capabilities.isCreativeMode) {
+			harvesters.set(player);
+			if(!world.isRemote) {
+				TileEntityBobble entity = (TileEntityBobble) world.getTileEntity(x, y, z);
+				if(entity != null) {
+					EntityItem item = new EntityItem(world, x + 0.5, y, z + 0.5, new ItemStack(this, 1, entity.type.ordinal()));
+					item.motionX = 0;
+					item.motionY = 0;
+					item.motionZ = 0;
+					world.spawnEntityInWorld(item);
+				}
 			}
+			harvesters.set(null);
 		}
-		
-		super.breakBlock(world, x, y, z, block, meta);
+	}
+	
+	@Override
+	public void harvestBlock(World world, EntityPlayer player, int x, int y, int z, int meta) {
+		player.addStat(StatList.mineBlockStatArray[getIdFromBlock(this)], 1);
+		player.addExhaustion(0.025F);
 	}
 
 	@Override
@@ -191,8 +198,9 @@ public class BlockBobble extends BlockContainer implements IGUIProvider {
 		NOS(			"Dr Nostalgia",						"Dr Nostalgia",		"SSG and Vortex models",									"Take a picture, I'ma pose, paparazzi$I've been drinking, moving like a zombie",					true,	ScrapType.BOARD_TRANSISTOR),
 		DRILLGON(		"Drillgon200",						"Drillgon200",		"1.12 Port",												null,																								false,	ScrapType.CPU_LOGIC),
 		CIRNO(			"Cirno",							"Cirno",			"the only multi layered skin i had",						"No brain. Head empty.",																			true,	ScrapType.BOARD_BLANK),
-		MICROWAVE(		"Microwave",						"Microwave",		"OC Compatibility",												"they call me the food heater",																		true,	ScrapType.BRIDGE_BIOS),
-		PEEP(			"Peep",								"LePeeperSauvage",	"Coilgun, Leadburster and Congo Lake models, BDCL QC",		"Fluffy ears can't hide in ash, nor snow.",															true,	ScrapType.CPU_CLOCK);
+		MICROWAVE(		"Microwave",						"Microwave",		"OC Compatibility",											"they call me the food heater",																		true,	ScrapType.BOARD_CONVERTER),
+		PEEP(			"Peep",								"LePeeperSauvage",	"Coilgun, Leadburster and Congo Lake models, BDCL QC",		"Fluffy ears can't hide in ash, nor snow.",															true,	ScrapType.CARD_BOARD),
+		MELLOW(			"MELLOWARPEGGIATION",				"Mellow",			"Industrial lighting, animation tools",						"Make something cool now, ask for permission later.",												true,	ScrapType.CARD_PROCESSOR);
 
 		public String name;			//the title of the tooltip
 		public String label;		//the name engraved in the socket
@@ -218,7 +226,7 @@ public class BlockBobble extends BlockContainer implements IGUIProvider {
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIScreenBobble((TileEntityBobble) world.getTileEntity(x, y, z));
 	}
 }

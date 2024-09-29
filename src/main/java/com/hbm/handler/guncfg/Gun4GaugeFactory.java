@@ -14,21 +14,20 @@ import com.hbm.handler.CasingEjector;
 import com.hbm.handler.GunConfiguration;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.items.ModItems;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.items.ItemAmmoEnums.Ammo4Gauge;
 import com.hbm.lib.HbmCollection;
 import com.hbm.lib.HbmCollection.EnumGunManufacturer;
 import com.hbm.main.ResourceManager;
 import com.hbm.lib.ModDamageSource;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 import com.hbm.particle.SpentCasing;
 import com.hbm.particle.SpentCasing.CasingType;
 import com.hbm.potion.HbmPotion;
 import com.hbm.render.anim.BusAnimation;
 import com.hbm.render.anim.BusAnimationSequence;
 import com.hbm.render.anim.HbmAnimations.AnimType;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
-
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import net.minecraft.entity.EntityCreature;
 import net.minecraft.entity.EntityLivingBase;
@@ -124,25 +123,25 @@ public class Gun4GaugeFactory {
 		
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("SAUER_RECOIL", new BusAnimationSequence()
-						.addKeyframePosition(0.5, 0, 0, 50)
-						.addKeyframePosition(0, 0, 0, 50)
+						.addPos(0.5, 0, 0, 50)
+						.addPos(0, 0, 0, 50)
 						)
 				.addBus("SAUER_TILT", new BusAnimationSequence()
-						.addKeyframePosition(0.0, 0, 0, 200)	// do nothing for 200ms
-						.addKeyframePosition(0, 0, 30, 150)	//tilt forward
-						.addKeyframePosition(45, 0, 30, 150)	//tilt sideways
-						.addKeyframePosition(45, 0, 30, 200)	//do nothing for 200ms (eject)
-						.addKeyframePosition(0, 0, 30, 150)	//restore sideways
-						.addKeyframePosition(0, 0, 0, 150)	//restore forward
+						.addPos(0.0, 0, 0, 200)	// do nothing for 200ms
+						.addPos(0, 0, 30, 150)	//tilt forward
+						.addPos(45, 0, 30, 150)	//tilt sideways
+						.addPos(45, 0, 30, 200)	//do nothing for 200ms (eject)
+						.addPos(0, 0, 30, 150)	//restore sideways
+						.addPos(0, 0, 0, 150)	//restore forward
 						)
 				.addBus("SAUER_COCK", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 500)	//do nothing for 500ms
-						.addKeyframePosition(1, 0, 0, 100)	//pull back lever for 100ms
-						.addKeyframePosition(0, 0, 0, 100)	//release lever for 100ms
+						.addPos(0, 0, 0, 500)	//do nothing for 500ms
+						.addPos(1, 0, 0, 100)	//pull back lever for 100ms
+						.addPos(0, 0, 0, 100)	//release lever for 100ms
 						)
 				.addBus("SAUER_SHELL_EJECT", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 500)	//do nothing for 500ms
-						.addKeyframePosition(0, 0, 1, 500)	//FLING!
+						.addPos(0, 0, 0, 500)	//do nothing for 500ms
+						.addPos(0, 0, 1, 500)	//FLING!
 						)
 				);
 		

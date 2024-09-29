@@ -8,8 +8,8 @@ import com.hbm.inventory.fluid.Fluids;
 import com.hbm.items.ModItems;
 import com.hbm.lib.RefStrings;
 import com.hbm.main.MainRegistry;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 
 import api.hbm.block.IToolable;
 import api.hbm.block.IToolable.ToolType;
@@ -69,7 +69,17 @@ public class ItemBlowtorch extends Item implements IFillableItem {
 			initNBT(stack);
 		}
 		
-		return stack.stackTagCompound.getInteger(type.getName());
+		//just in case
+		String name = Fluids.toNameCompat(type);
+		if(stack.stackTagCompound.hasKey(name)) {
+			int fill = stack.stackTagCompound.getInteger(name);
+			stack.stackTagCompound.removeTag(name);
+			stack.stackTagCompound.setInteger(Integer.toString(type.getID()), fill);
+			
+			return fill;
+		}
+			
+		return stack.stackTagCompound.getInteger(Integer.toString(type.getID()));
 	}
 	
 	public int getMaxFill(FluidType type) {
@@ -85,7 +95,7 @@ public class ItemBlowtorch extends Item implements IFillableItem {
 			initNBT(stack);
 		}
 		
-		stack.stackTagCompound.setInteger(type.getName(), fill);
+		stack.stackTagCompound.setInteger(Integer.toString(type.getID()), fill);
 	}
 	
 	public void initNBT(ItemStack stack) {
@@ -204,4 +214,14 @@ public class ItemBlowtorch extends Item implements IFillableItem {
 
 	@Override public boolean providesFluid(FluidType type, ItemStack stack) { return false; }
 	@Override public int tryEmpty(FluidType type, int amount, ItemStack stack) { return amount; }
+
+	@Override
+	public FluidType getFirstFluidType(ItemStack stack) {
+		return null;
+	}
+
+	@Override
+	public int getFill(ItemStack stack) {
+		return 0;
+	}
 }

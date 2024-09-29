@@ -4,6 +4,7 @@ import com.hbm.blocks.ModBlocks;
 import com.hbm.blocks.machine.rbmk.RBMKBase;
 import com.hbm.blocks.machine.rbmk.RBMKRod;
 import com.hbm.entity.projectile.EntityRBMKDebris.DebrisType;
+import com.hbm.handler.CompatHandler;
 import com.hbm.handler.radiation.ChunkRadiationManager;
 import com.hbm.inventory.container.ContainerRBMKRod;
 import com.hbm.inventory.gui.GUIRBMKRod;
@@ -11,8 +12,10 @@ import com.hbm.items.ModItems;
 import com.hbm.items.machine.ItemRBMKRod;
 import com.hbm.tileentity.machine.rbmk.TileEntityRBMKConsole.ColumnType;
 import com.hbm.util.Compat;
+import com.hbm.util.CompatEnergyControl;
 import com.hbm.util.ParticleUtil;
 
+import api.hbm.tile.IInfoProviderEC;
 import cpw.mods.fml.common.Optional;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -20,7 +23,6 @@ import li.cil.oc.api.machine.Arguments;
 import li.cil.oc.api.machine.Callback;
 import li.cil.oc.api.machine.Context;
 import li.cil.oc.api.network.SimpleComponent;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -30,8 +32,11 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Optional.InterfaceList({@Optional.Interface(iface = "li.cil.oc.api.network.SimpleComponent", modid = "OpenComputers")})
-public class TileEntityRBMKRod extends TileEntityRBMKSlottedBase implements IRBMKFluxReceiver, IRBMKLoadable, SimpleComponent {
+public class TileEntityRBMKRod extends TileEntityRBMKSlottedBase implements IRBMKFluxReceiver, IRBMKLoadable, SimpleComponent, IInfoProviderEC, CompatHandler.OCComponent {
 	
 	//amount of "neutron energy" buffered for the next tick to use for the reaction
 	public double fluxFast;
@@ -390,6 +395,7 @@ public class TileEntityRBMKRod extends TileEntityRBMKSlottedBase implements IRBM
 	
 	// do some opencomputer stuff
 	@Override
+	@Optional.Method(modid = "OpenComputers")
 	public String getComponentName() {
 		return "rbmk_fuel_rod";
 	}
@@ -460,25 +466,21 @@ public class TileEntityRBMKRod extends TileEntityRBMKSlottedBase implements IRBM
 	@Callback(direct = true)
 	@Optional.Method(modid = "OpenComputers")
 	public Object[] getInfo(Context context, Arguments args) {
-		Object OC_enrich_buf;
-		Object OC_poison_buf;
-		Object OC_hull_buf;
-		Object OC_core_buf;
-		String OC_type;
+		List<Object> returnValues = new ArrayList<>();
 		if(slots[0] != null && slots[0].getItem() instanceof ItemRBMKRod) {
-			OC_enrich_buf = ItemRBMKRod.getEnrichment(slots[0]);
-			OC_poison_buf = ItemRBMKRod.getPoison(slots[0]);
-			OC_hull_buf = ItemRBMKRod.getHullHeat(slots[0]);
-			OC_core_buf = ItemRBMKRod.getCoreHeat(slots[0]);
-			OC_type = slots[0].getItem().getUnlocalizedName();
-		} else {
-			OC_enrich_buf = "N/A";
-			OC_poison_buf = "N/A";
-			OC_hull_buf = "N/A";
-			OC_core_buf = "N/A";
-			OC_type = "N/A";
-		}
-		return new Object[] {heat, OC_hull_buf, OC_core_buf, fluxSlow, fluxFast, OC_enrich_buf, OC_poison_buf, OC_type, ((RBMKRod)this.getBlockType()).moderated, xCoord, yCoord, zCoord};
+			returnValues.add(ItemRBMKRod.getHullHeat(slots[0]));
+			returnValues.add(ItemRBMKRod.getCoreHeat(slots[0]));
+			returnValues.add(ItemRBMKRod.getEnrichment(slots[0]));
+			returnValues.add(ItemRBMKRod.getPoison(slots[0]));
+			returnValues.add(slots[0].getItem().getUnlocalizedName());
+		} else
+			for (int i = 0; i < 5; i++)
+				returnValues.add("N/A");
+
+		return new Object[] {
+				heat, returnValues.get(0), returnValues.get(1),
+				fluxSlow, fluxFast, returnValues.get(2), returnValues.get(3), returnValues.get(4),
+				((RBMKRod)this.getBlockType()).moderated, xCoord, yCoord, zCoord};
 	}
 
 	@Callback(direct = true)
@@ -500,7 +502,18 @@ public class TileEntityRBMKRod extends TileEntityRBMKSlottedBase implements IRBM
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIRBMKRod(player.inventory, this);
+	}
+
+	@Override
+	public void provideExtraInfo(NBTTagCompound data) {
+		if(slots[0] != null && slots[0].getItem() instanceof ItemRBMKRod) {
+			data.setDouble(CompatEnergyControl.D_DEPLETION_PERCENT, ((1.0D - ItemRBMKRod.getEnrichment(slots[0])) * 100_000.0D) / 1_000.0D);
+			data.setDouble(CompatEnergyControl.D_XENON_PERCENT, ItemRBMKRod.getPoison(slots[0]));
+			data.setDouble(CompatEnergyControl.D_SKIN_C, ItemRBMKRod.getHullHeat(slots[0]));
+			data.setDouble(CompatEnergyControl.D_CORE_C, ItemRBMKRod.getCoreHeat(slots[0]));
+			data.setDouble(CompatEnergyControl.D_MELT_C, ((ItemRBMKRod) slots[0].getItem()).meltingPoint);
+		}
 	}
 }

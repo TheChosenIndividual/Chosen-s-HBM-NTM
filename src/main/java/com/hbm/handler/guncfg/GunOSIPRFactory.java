@@ -2,17 +2,16 @@ package com.hbm.handler.guncfg;
 
 import java.util.ArrayList;
 
-import com.hbm.blocks.generic.RedBarrel;
+import com.hbm.blocks.bomb.BlockDetonatable;
 import com.hbm.handler.BulletConfigSyncingUtil;
 import com.hbm.handler.BulletConfiguration;
 import com.hbm.handler.GunConfiguration;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.items.ModItems;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.lib.HbmCollection.EnumGunManufacturer;
 import com.hbm.lib.ModDamageSource;
 import com.hbm.potion.HbmPotion;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
-
 import net.minecraft.block.Block;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.potion.PotionEffect;
@@ -122,16 +121,16 @@ public class GunOSIPRFactory {
 
 		bullet.bntRicochet = (ball, x, y, z) -> {
 			Block block = ball.worldObj.getBlock(x, y, z);
-			if(block instanceof RedBarrel)
-				((RedBarrel) block).explode(ball.worldObj, x, y, z);
-
+			if(block instanceof BlockDetonatable) {
+				((BlockDetonatable) block).onShot(ball.worldObj, x, y, z);
+			}
 		};
 
 		bullet.bntImpact = (ball, x, y, z, sideHit) -> {
-			final Block block = ball.worldObj.getBlock(x, y, z);
-			if(block instanceof RedBarrel)
-				((RedBarrel) block).explode(ball.worldObj, x, y, z);
-
+			Block block = ball.worldObj.getBlock(x, y, z);
+			if(block instanceof BlockDetonatable) {
+				((BlockDetonatable) block).onShot(ball.worldObj, x, y, z);
+			}
 		};
 		
 		return bullet;

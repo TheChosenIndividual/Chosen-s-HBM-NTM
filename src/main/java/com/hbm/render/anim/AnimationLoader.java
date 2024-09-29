@@ -14,6 +14,7 @@ import com.google.gson.JsonArray;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.ResourceLocation;
 
+import com.hbm.render.anim.BusAnimationKeyframe.IType;
 import com.hbm.render.anim.BusAnimationSequence.Dimension;
 
 public class AnimationLoader {
@@ -142,8 +143,9 @@ public class AnimationLoader {
 
         double value = array.get(0).getAsDouble();
         int duration = array.get(1).getAsInt();
+        IType interpolation = array.size() >= 3 ? IType.valueOf(array.get(2).getAsString()) : IType.LINEAR;
 
-        return new BusAnimationKeyframe(value, duration);
+        return new BusAnimationKeyframe(value, duration, interpolation);
     }
 
 }

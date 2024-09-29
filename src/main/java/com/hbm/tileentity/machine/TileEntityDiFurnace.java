@@ -12,11 +12,12 @@ import com.hbm.items.ModItems;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.INBTPacketReceiver;
 import com.hbm.tileentity.TileEntityMachinePolluting;
+import com.hbm.util.CompatEnergyControl;
 
 import api.hbm.fluid.IFluidStandardSender;
+import api.hbm.tile.IInfoProviderEC;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
@@ -27,7 +28,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityDiFurnace extends TileEntityMachinePolluting implements IFluidStandardSender, IGUIProvider {
+public class TileEntityDiFurnace extends TileEntityMachinePolluting implements IFluidStandardSender, IGUIProvider, IInfoProviderEC {
 
 	public int progress;
 	public int fuel;
@@ -257,7 +258,7 @@ public class TileEntityDiFurnace extends TileEntityMachinePolluting implements I
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIDiFurnace(player.inventory, this);
 	}
 
@@ -269,5 +270,12 @@ public class TileEntityDiFurnace extends TileEntityMachinePolluting implements I
 	@Override
 	public FluidTank[] getSendingTanks() {
 		return this.getSmokeTanks();
+	}
+
+	@Override
+	public void provideExtraInfo(NBTTagCompound data) {
+		data.setLong(CompatEnergyControl.L_ENERGY_, this.fuel);
+		data.setLong(CompatEnergyControl.L_CAPACITY_, this.maxFuel);
+		data.setInteger(CompatEnergyControl.I_PROGRESS, this.progress);
 	}
 }

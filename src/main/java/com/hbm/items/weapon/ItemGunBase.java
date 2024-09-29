@@ -18,15 +18,15 @@ import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.items.IEquipReceiver;
 import com.hbm.items.ModItems;
 import com.hbm.items.armor.ArmorFSB;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.lib.HbmCollection;
-import com.hbm.packet.AuxParticlePacketNT;
-import com.hbm.packet.GunAnimationPacket;
-import com.hbm.packet.GunButtonPacket;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
+import com.hbm.packet.toclient.GunAnimationPacket;
+import com.hbm.packet.toserver.GunButtonPacket;
 import com.hbm.render.anim.BusAnimation;
 import com.hbm.render.anim.HbmAnimations.AnimType;
 import com.hbm.render.util.RenderScreenOverlay;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
 import com.hbm.util.I18nUtil;
 import com.hbm.util.InventoryUtil;
 
@@ -241,9 +241,6 @@ public class ItemGunBase extends Item implements IHoldableWeapon, IItemHUD, IEqu
 			for(int i = 0; i < bullets; i++) {
 				spawnProjectile(world, player, stack, BulletConfigSyncingUtil.getKey(config));
 			}
-
-			if(player instanceof EntityPlayerMP)
-				PacketDispatcher.wrapper.sendTo(new GunAnimationPacket(AnimType.CYCLE.ordinal()), (EntityPlayerMP) player);
 			
 			useUpAmmo(player, stack, true);
 			player.inventoryContainer.detectAndSendChanges();
@@ -251,8 +248,15 @@ public class ItemGunBase extends Item implements IHoldableWeapon, IItemHUD, IEqu
 			int wear = (int) Math.ceil(config.wear / (1F + EnchantmentHelper.getEnchantmentLevel(Enchantment.unbreaking.effectId, stack)));
 			setItemWear(stack, getItemWear(stack) + wear);
 		}
+
+		if(player instanceof EntityPlayerMP) {
+			AnimType animType = getMag(stack) == 0 ? AnimType.CYCLE_EMPTY : AnimType.CYCLE;
+			PacketDispatcher.wrapper.sendTo(new GunAnimationPacket(animType.ordinal()), (EntityPlayerMP) player);
+		}
 		
-		world.playSoundAtEntity(player, mainConfig.firingSound, mainConfig.firingVolume, mainConfig.firingPitch);
+		String firingSound = mainConfig.firingSound;
+		if (getMag(stack) == 0 && mainConfig.firingSoundEmpty != null) firingSound = mainConfig.firingSoundEmpty;
+		world.playSoundAtEntity(player, firingSound, mainConfig.firingVolume, mainConfig.firingPitch);
 		
 		if(mainConfig.ejector != null && !mainConfig.ejector.getAfterReload())
 			queueCasing(player, mainConfig.ejector, config, stack);
@@ -364,6 +368,8 @@ public class ItemGunBase extends Item implements IHoldableWeapon, IItemHUD, IEqu
 				setIsReloading(stack, false);
 				return;
 			}
+
+			String reloadSound = mainConfig.reloadSoundEmpty != null && getMag(stack) == 0 ? mainConfig.reloadSoundEmpty : mainConfig.reloadSound;
 			
 			ammo.stacksize = toConsume;
 			setMag(stack, getMag(stack) + toAdd);
@@ -375,11 +381,11 @@ public class ItemGunBase extends Item implements IHoldableWeapon, IItemHUD, IEqu
 				AnimType animType = availableFills <= 1 ? AnimType.RELOAD_END : AnimType.RELOAD_CYCLE;
 				PacketDispatcher.wrapper.sendTo(new GunAnimationPacket(animType.ordinal()), (EntityPlayerMP) player);
 				if (availableFills > 1 && !mainConfig.reloadSoundEnd)
-					world.playSoundAtEntity(player, mainConfig.reloadSound, 1.0F, 1.0F);
+					world.playSoundAtEntity(player, reloadSound, 1.0F, 1.0F);
 			}
 			
 			if(hasLoaded && mainConfig.reloadSoundEnd)
-				world.playSoundAtEntity(player, mainConfig.reloadSound, 1.0F, 1.0F);
+				world.playSoundAtEntity(player, reloadSound, 1.0F, 1.0F);
 			
 			if(mainConfig.ejector != null && mainConfig.ejector.getAfterReload())
 				queueCasing(player, mainConfig.ejector, prevCfg, stack);
@@ -418,8 +424,10 @@ public class ItemGunBase extends Item implements IHoldableWeapon, IItemHUD, IEqu
 		if(getIsReloading(stack))
 			return;
 		
-		if(!mainConfig.reloadSoundEnd)
-			world.playSoundAtEntity(player, mainConfig.reloadSound, 1.0F, 1.0F);
+		if(!mainConfig.reloadSoundEnd) {
+			String reloadSound = mainConfig.reloadSoundEmpty != null && getMag(stack) == 0 ? mainConfig.reloadSoundEmpty : mainConfig.reloadSound;
+			world.playSoundAtEntity(player, reloadSound, 1.0F, 1.0F);
+		}
 		
 		if(!world.isRemote) {
 			AnimType reloadType = getMag(stack) == 0 ? AnimType.RELOAD_EMPTY : AnimType.RELOAD;
@@ -793,7 +801,7 @@ public class ItemGunBase extends Item implements IHoldableWeapon, IItemHUD, IEqu
 	}
 	
 	@Override
-	public void onEquip(EntityPlayer player) {
+	public void onEquip(EntityPlayer player, ItemStack stack) {
 		if(!mainConfig.equipSound.isEmpty() && !player.worldObj.isRemote) {
 			player.worldObj.playSoundAtEntity(player, mainConfig.equipSound, 1, 1);
 		}

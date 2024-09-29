@@ -7,6 +7,7 @@ import com.hbm.handler.CasingEjector;
 import com.hbm.handler.GunConfiguration;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.items.ModItems;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.items.ItemAmmoEnums.Ammo762NATO;
 import com.hbm.lib.HbmCollection;
 import com.hbm.lib.RefStrings;
@@ -15,10 +16,8 @@ import com.hbm.particle.SpentCasing;
 import com.hbm.particle.SpentCasing.CasingType;
 import com.hbm.potion.HbmPotion;
 import com.hbm.render.anim.BusAnimation;
-import com.hbm.render.anim.BusAnimationKeyframe;
 import com.hbm.render.anim.BusAnimationSequence;
 import com.hbm.render.anim.HbmAnimations.AnimType;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
 
 import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.ResourceLocation;
@@ -58,15 +57,15 @@ public class Gun762mmFactory {
 		
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("RECOIL", new BusAnimationSequence()
-						.addKeyframePosition(1, 0, 0, 25)
-						.addKeyframePosition(0, 0, 0, 75)
+						.addPos(1, 0, 0, 25)
+						.addPos(0, 0, 0, 75)
 						)
 				);
 		
 		config.animations.put(AnimType.RELOAD, new BusAnimation()
 				.addBus("MAG", new BusAnimationSequence()
-						.addKeyframePosition(0, -1, 0, 500)
-						.addKeyframePosition(0, 0, 0, 500)
+						.addPos(0, -1, 0, 500)
+						.addPos(0, 0, 0, 500)
 						)
 				);
 		
@@ -177,19 +176,19 @@ public class Gun762mmFactory {
 		
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("RECOIL", new BusAnimationSequence()
-						.addKeyframePosition(1, 0, 0, 25)
-						.addKeyframePosition(0, 0, 0, 75)
+						.addPos(1, 0, 0, 25)
+						.addPos(0, 0, 0, 75)
 						)
 				.addBus("LEVER_PULL", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 375) //wait out recoil and lever flick
-						.addKeyframePosition(-1, 0, 0, 375) //pull back bolt
-						.addKeyframePosition(0, 0, 0, 375) //release bolt
+						.addPos(0, 0, 0, 375) //wait out recoil and lever flick
+						.addPos(-1, 0, 0, 375) //pull back bolt
+						.addPos(0, 0, 0, 375) //release bolt
 						)
 				.addBus("LEVER_ROTATE", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 250) //wait out recoil
-						.addKeyframePosition(1, 0, 0, 125) //flick up lever in  125ms
-						.addKeyframePosition(1, 0, 0, 750) //pull action
-						.addKeyframePosition(0, 0, 0, 125) //flick down lever again
+						.addPos(0, 0, 0, 250) //wait out recoil
+						.addPos(1, 0, 0, 125) //flick up lever in  125ms
+						.addPos(1, 0, 0, 750) //pull action
+						.addPos(0, 0, 0, 125) //flick down lever again
 						)
 				);
 		
@@ -216,19 +215,19 @@ public class Gun762mmFactory {
 		
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("RECOIL", new BusAnimationSequence()
-						.addKeyframePosition(1, 0, 0, 25)
-						.addKeyframePosition(0, 0, 0, 75)
+						.addPos(1, 0, 0, 25)
+						.addPos(0, 0, 0, 75)
 						)
 				.addBus("LEVER_PULL", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 375) //wait out recoil and lever flick
-						.addKeyframePosition(-1, 0, 0, 375) //pull back bolt
-						.addKeyframePosition(0, 0, 0, 375) //release bolt
+						.addPos(0, 0, 0, 375) //wait out recoil and lever flick
+						.addPos(-1, 0, 0, 375) //pull back bolt
+						.addPos(0, 0, 0, 375) //release bolt
 						)
 				.addBus("LEVER_ROTATE", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 250) //wait out recoil
-						.addKeyframePosition(1, 0, 0, 125) //flick up lever in  125ms
-						.addKeyframePosition(1, 0, 0, 750) //pull action
-						.addKeyframePosition(0, 0, 0, 125) //flick down lever again
+						.addPos(0, 0, 0, 250) //wait out recoil
+						.addPos(1, 0, 0, 125) //flick up lever in  125ms
+						.addPos(1, 0, 0, 750) //pull action
+						.addPos(0, 0, 0, 125) //flick down lever again
 						)
 				);
 		
@@ -259,19 +258,19 @@ public class Gun762mmFactory {
 		
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("RECOIL", new BusAnimationSequence()
-						.addKeyframePosition(1, 0, 0, 25)
-						.addKeyframePosition(0, 0, 0, 75)
+						.addPos(1, 0, 0, 25)
+						.addPos(0, 0, 0, 75)
 						)
 				.addBus("LEVER_PULL", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 375) //wait out recoil and lever flick
-						.addKeyframePosition(-1, 0, 0, 375) //pull back bolt
-						.addKeyframePosition(0, 0, 0, 375) //release bolt
+						.addPos(0, 0, 0, 375) //wait out recoil and lever flick
+						.addPos(-1, 0, 0, 375) //pull back bolt
+						.addPos(0, 0, 0, 375) //release bolt
 						)
 				.addBus("LEVER_ROTATE", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 250) //wait out recoil
-						.addKeyframePosition(1, 0, 0, 125) //flick up lever in  125ms
-						.addKeyframePosition(1, 0, 0, 750) //pull action
-						.addKeyframePosition(0, 0, 0, 125) //flick down lever again
+						.addPos(0, 0, 0, 250) //wait out recoil
+						.addPos(1, 0, 0, 125) //flick up lever in  125ms
+						.addPos(1, 0, 0, 750) //pull action
+						.addPos(0, 0, 0, 125) //flick down lever again
 						)
 				);
 		

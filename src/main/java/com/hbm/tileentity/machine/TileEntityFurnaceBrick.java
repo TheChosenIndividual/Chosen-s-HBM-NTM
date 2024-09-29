@@ -14,7 +14,6 @@ import com.hbm.tileentity.TileEntityMachineBase;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
@@ -40,6 +39,8 @@ public class TileEntityFurnaceBrick extends TileEntityMachineBase implements IGU
 		burnSpeed.put(Item.getItemFromBlock(Blocks.netherrack),		4);
 		burnSpeed.put(Item.getItemFromBlock(Blocks.cobblestone),	2);
 		burnSpeed.put(Item.getItemFromBlock(Blocks.sand),			2);
+		burnSpeed.put(Item.getItemFromBlock(Blocks.log),			2);
+		burnSpeed.put(Item.getItemFromBlock(Blocks.log2),			2);
 	}
 	
 	public int burnTime;
@@ -226,7 +227,7 @@ public class TileEntityFurnaceBrick extends TileEntityMachineBase implements IGU
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIFurnaceBrick(player.inventory, this);
 	}
 }

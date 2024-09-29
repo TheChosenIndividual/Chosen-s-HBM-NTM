@@ -3,6 +3,7 @@ package com.hbm.entity.effect;
 import java.awt.Color;
 import java.util.ArrayList;
 
+import com.hbm.main.MainRegistry;
 import com.hbm.util.BobMathUtil;
 import com.hbm.util.TrackerUtil;
 
@@ -28,6 +29,9 @@ public class EntityNukeTorex extends Entity {
 	public double lastSpawnY = - 1;
 	public ArrayList<Cloudlet> cloudlets = new ArrayList();
 	//public static int cloudletLife = 200;
+
+	public boolean didPlaySound = false;
+	public boolean didShake = false;
 
 	public EntityNukeTorex(World world) {
 		super(world);
@@ -104,6 +108,13 @@ public class EntityNukeTorex extends Entity {
 							.setScale(7F, 2F)
 							.setMotion(ticksExisted > 15 ? 0.75 : 0));
 				}
+				
+				if(!didPlaySound) {
+					if(MainRegistry.proxy.me() != null && MainRegistry.proxy.me().getDistanceToEntity(this) < (ticksExisted * 1.5 + 1) * 1.5) {
+						MainRegistry.proxy.playSoundClient(posX, posY, posZ, "hbm:weapon.nuclearExplosion", 10_000F, 1F);
+						didPlaySound = true;
+					}
+				}
 			}
 			
 			// spawn ring clouds
@@ -122,7 +133,7 @@ public class EntityNukeTorex extends Entity {
 				for(int i = 0; i < 20; i++) {
 					for(int j = 0; j < 4; j++) {
 						float angle = (float) (Math.PI * 2 * rand.nextDouble());
-						Vec3 vec = Vec3.createVectorHelper(torusWidth + rollerSize * (3 + rand.nextDouble()), 0, 0);
+						Vec3 vec = Vec3.createVectorHelper(torusWidth + rollerSize * (5 + rand.nextDouble()), 0, 0);
 						vec.rotateAroundZ((float) (Math.PI / 45 * j));
 						vec.rotateAroundY(angle);
 						Cloudlet cloud = new Cloudlet(posX + vec.xCoord, posY + coreHeight - 5 + j * s, posZ + vec.zCoord, angle, 0, (int) ((20 + ticksExisted / 10) * (1 + rand.nextDouble() * 0.1)), TorexType.CONDENSATION);

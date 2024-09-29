@@ -8,14 +8,13 @@ import com.hbm.handler.BulletConfiguration;
 import com.hbm.handler.CasingEjector;
 import com.hbm.inventory.container.ContainerTurretBase;
 import com.hbm.inventory.gui.GUITurretSentry;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 import com.hbm.tileentity.IGUIProvider;
 
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
@@ -26,12 +25,12 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 public class TileEntityTurretSentry extends TileEntityTurretBaseNT implements IGUIProvider {
 
-	private boolean didJustShootLeft = false;
-	private boolean retractingLeft = false;
+	protected boolean didJustShootLeft = false;
+	protected boolean retractingLeft = false;
 	public double barrelLeftPos = 0;
 	public double lastBarrelLeftPos = 0;
-	private boolean didJustShootRight = false;
-	private boolean retractingRight = false;
+	protected boolean didJustShootRight = false;
+	protected boolean retractingRight = false;
 	public double barrelRightPos = 0;
 	public double lastBarrelRightPos = 0;
 
@@ -256,7 +255,7 @@ public class TileEntityTurretSentry extends TileEntityTurretBaseNT implements IG
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUITurretSentry(player.inventory, this);
 	}
 }

@@ -22,7 +22,6 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.texture.IIconRegister;
@@ -39,6 +38,15 @@ import net.minecraft.world.World;
 import net.minecraftforge.client.model.obj.WavefrontObject;
 
 public class NTMAnvil extends BlockFallingNT implements ITooltipProvider, IGUIProvider {
+
+	public static final int TIER_IRON = 1;
+	public static final int TIER_STEEL = 2;
+	public static final int TIER_OIL = 3;
+	public static final int TIER_NUCLEAR = 4;
+	public static final int TIER_RBMK = 5;
+	public static final int TIER_FUSION = 6;
+	public static final int TIER_PARTICLE = 7;
+	public static final int TIER_GERALD = 8;
 	
 	public final int tier;
 	
@@ -183,7 +191,7 @@ public class NTMAnvil extends BlockFallingNT implements ITooltipProvider, IGUIPr
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIAnvil(player.inventory, ((NTMAnvil)world.getBlock(x, y, z)).tier);
 	}
 

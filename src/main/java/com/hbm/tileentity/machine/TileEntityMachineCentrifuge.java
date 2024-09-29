@@ -1,7 +1,10 @@
 package com.hbm.tileentity.machine;
 
+import java.io.IOException;
 import java.util.List;
 
+import com.google.gson.JsonObject;
+import com.google.gson.stream.JsonWriter;
 import com.hbm.blocks.ModBlocks;
 import com.hbm.inventory.UpgradeManager;
 import com.hbm.inventory.container.ContainerCentrifuge;
@@ -11,16 +14,19 @@ import com.hbm.items.machine.ItemMachineUpgrade.UpgradeType;
 import com.hbm.lib.Library;
 import com.hbm.main.MainRegistry;
 import com.hbm.sound.AudioWrapper;
+import com.hbm.tileentity.IConfigurableMachine;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.IUpgradeInfoProvider;
 import com.hbm.tileentity.TileEntityMachineBase;
 import com.hbm.util.BobMathUtil;
+import com.hbm.util.CompatEnergyControl;
 import com.hbm.util.I18nUtil;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
+import api.hbm.tile.IInfoProviderEC;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -29,17 +35,38 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityMachineCentrifuge extends TileEntityMachineBase implements IEnergyUser, IGUIProvider, IUpgradeInfoProvider {
+public class TileEntityMachineCentrifuge extends TileEntityMachineBase implements IEnergyReceiverMK2, IGUIProvider, IUpgradeInfoProvider, IInfoProviderEC, IConfigurableMachine{
 	
 	public int progress;
 	public long power;
 	public boolean isProgressing;
-	public static final int maxPower = 100000;
-	public static final int processingSpeed = 200;
 	private int audioDuration = 0;
 	
 	private AudioWrapper audio;
+
+	//configurable values
+	public static int maxPower = 100000;
+	public static int processingSpeed = 200;
+	public static int baseConsumption = 200;
+
+	public String getConfigName() {
+		return "centrifuge";
+	}
+	/* reads the JSON object and sets the machine's parameters, use defaults and ignore if a value is not yet present */
+	public void readIfPresent(JsonObject obj) {
+		maxPower = IConfigurableMachine.grab(obj, "I:powerCap", maxPower);
+		processingSpeed = IConfigurableMachine.grab(obj, "I:timeToProcess", processingSpeed);
+		baseConsumption = IConfigurableMachine.grab(obj, "I:consumption", baseConsumption);
+	}
+	/* writes the entire config for this machine using the relevant values */
+	public void writeConfig(JsonWriter writer) throws IOException {
+		writer.name("I:powerCap").value(maxPower);
+		writer.name("I:timeToProcess").value(processingSpeed);
+		writer.name("I:consumption").value(baseConsumption);
+	}
+
 
 	/*
 	 * So why do we do this now? You have a funny mekanism/thermal/whatever pipe and you want to output stuff from a side
@@ -153,20 +180,20 @@ public class TileEntityMachineCentrifuge extends TileEntityMachineBase implement
 	public void updateEntity() {
 
 		if(!worldObj.isRemote) {
-			
-			this.updateStandardConnections(worldObj, xCoord, yCoord, zCoord);
+
+			for(ForgeDirection dir : ForgeDirection.VALID_DIRECTIONS) this.trySubscribe(worldObj, xCoord + dir.offsetX, yCoord + dir.offsetY, zCoord + dir.offsetZ, dir);
 
 			power = Library.chargeTEFromItems(slots, 1, power, maxPower);
 			
-			int consumption = 200;
+			int consumption = baseConsumption;
 			int speed = 1;
 			
 			UpgradeManager.eval(slots, 6, 7);
 			speed += Math.min(UpgradeManager.getLevel(UpgradeType.SPEED), 3);
-			consumption += Math.min(UpgradeManager.getLevel(UpgradeType.SPEED), 3) * 200;
+			consumption += Math.min(UpgradeManager.getLevel(UpgradeType.SPEED), 3) * baseConsumption;
 			
 			speed *= (1 + Math.min(UpgradeManager.getLevel(UpgradeType.OVERDRIVE), 3) * 5);
-			consumption += Math.min(UpgradeManager.getLevel(UpgradeType.OVERDRIVE), 3) * 10000;
+			consumption += Math.min(UpgradeManager.getLevel(UpgradeType.OVERDRIVE), 3) * baseConsumption * 50;
 			
 			consumption /= (1 + Math.min(UpgradeManager.getLevel(UpgradeType.POWER), 3));
 
@@ -195,11 +222,7 @@ public class TileEntityMachineCentrifuge extends TileEntityMachineBase implement
 				progress = 0;
 			}
 			
-			NBTTagCompound data = new NBTTagCompound();
-			data.setLong("power", power);
-			data.setInteger("progress", progress);
-			data.setBoolean("isProgressing", isProgressing);
-			this.networkPack(data, 50);
+			this.networkPackNT(50);
 		} else {
 			
 			if(isProgressing) {
@@ -231,14 +254,21 @@ public class TileEntityMachineCentrifuge extends TileEntityMachineBase implement
 			}
 		}
 	}
-
+	
 	@Override
-	public void networkUnpack(NBTTagCompound data) {
-		super.networkUnpack(data);
-		
-		this.power = data.getLong("power");
-		this.progress = data.getInteger("progress");
-		this.isProgressing = data.getBoolean("isProgressing");
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeLong(power);
+		buf.writeInt(progress);
+		buf.writeBoolean(isProgressing);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		power = buf.readLong();
+		progress = buf.readInt();
+		isProgressing = buf.readBoolean();
 	}
 
 	@Override
@@ -314,7 +344,7 @@ public class TileEntityMachineCentrifuge extends TileEntityMachineBase implement
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIMachineCentrifuge(player.inventory, this);
 	}
 
@@ -327,7 +357,7 @@ public class TileEntityMachineCentrifuge extends TileEntityMachineBase implement
 	public void provideInfo(UpgradeType type, int level, List<String> info, boolean extendedInfo) {
 		info.add(IUpgradeInfoProvider.getStandardLabel(ModBlocks.machine_centrifuge));
 		if(type == UpgradeType.SPEED) {
-			info.add(EnumChatFormatting.GREEN + I18nUtil.resolveKey(this.KEY_DELAY, "-" + (level * 100) + "%"));
+			info.add(EnumChatFormatting.GREEN + I18nUtil.resolveKey(this.KEY_DELAY, "-" + (100 - 100 / (level + 1)) + "%"));
 			info.add(EnumChatFormatting.RED + I18nUtil.resolveKey(this.KEY_CONSUMPTION, "+" + (level * 100) + "%"));
 		}
 		if(type == UpgradeType.POWER) {
@@ -344,5 +374,11 @@ public class TileEntityMachineCentrifuge extends TileEntityMachineBase implement
 		if(type == UpgradeType.POWER) return 3;
 		if(type == UpgradeType.OVERDRIVE) return 3;
 		return 0;
+	}
+
+	@Override
+	public void provideExtraInfo(NBTTagCompound data) {
+		data.setBoolean(CompatEnergyControl.B_ACTIVE, this.progress > 0);
+		data.setInteger(CompatEnergyControl.B_ACTIVE, this.progress);
 	}
 }

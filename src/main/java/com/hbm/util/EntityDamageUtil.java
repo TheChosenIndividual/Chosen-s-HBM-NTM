@@ -2,44 +2,18 @@ package com.hbm.util;
 
 import java.lang.reflect.Method;
 
-import com.hbm.handler.ArmorModHandler;
-import com.hbm.items.ModItems;
-
 import cpw.mods.fml.relauncher.ReflectionHelper;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.entity.passive.EntityTameable;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
 import net.minecraft.potion.Potion;
 import net.minecraft.util.DamageSource;
-import net.minecraft.util.EntityDamageSource;
 import net.minecraftforge.common.ForgeHooks;
 
 public class EntityDamageUtil {
-	
-	public static boolean wasAttackedByV1(DamageSource source) {
-
-		if(source instanceof EntityDamageSource) {
-			Entity attacker = ((EntityDamageSource) source).getEntity();
-			
-			if(attacker instanceof EntityPlayer) {
-				EntityPlayer player = (EntityPlayer) attacker;
-				ItemStack chestplate = player.inventory.armorInventory[2];
-				
-				if(chestplate != null && ArmorModHandler.hasMods(chestplate)) {
-					ItemStack[] mods = ArmorModHandler.pryMods(chestplate);
-					
-					if(mods[ArmorModHandler.extra] != null && mods[ArmorModHandler.extra].getItem() == ModItems.v1) {
-						return true;
-					}
-				}
-			}
-		}
-		
-		return false;
-	}
 	
 	/**
 	 * Attacks the given entity twice, based on a piecring percentage. The second hit sets the damage source to bypass armor.
@@ -77,6 +51,24 @@ public class EntityDamageUtil {
 		} else {
 			return true;
 		}
+	}
+	
+	public static float getDamageAfterTax(EntityLivingBase living, DamageSource source, float amount) {
+		amount = ForgeHooks.onLivingHurt(living, source, amount);
+		if(amount <= 0) return 0;
+		amount = applyArmorCalculations(living, source, amount);
+		return amount;
+	}
+	
+	public static boolean attackArmorPiercing(EntityLivingBase living, DamageSource sourceDamageCalc, DamageSource sourceArmorPiercing, float amount, float piercing) {
+		if(piercing <= 0) return living.attackEntityFrom(sourceDamageCalc, amount);
+		//damage intended to pass the armor
+		float afterTax = getDamageAfterTax(living, sourceDamageCalc, amount);
+		//damage removed by the calculation
+		float reduced = Math.max(amount - afterTax, 0F);
+		//damage that would pass + damage tthat wouldn't pass * AP percentage
+		return attackEntityFromIgnoreIFrame(living, sourceArmorPiercing, Math.max(afterTax + (reduced * piercing), 0F));
+		
 	}
 	
 	/** Currently just a copy of the vanilla damage code */
@@ -131,8 +123,8 @@ public class EntityDamageUtil {
 					if(entity instanceof EntityPlayer) {
 						living.recentlyHit = 100;
 						living.attackingPlayer = (EntityPlayer) entity;
-					} else if(entity instanceof net.minecraft.entity.passive.EntityTameable) {
-						net.minecraft.entity.passive.EntityTameable entitywolf = (net.minecraft.entity.passive.EntityTameable) entity;
+					} else if(entity instanceof EntityTameable) {
+						EntityTameable entitywolf = (EntityTameable) entity;
 
 						if(entitywolf.isTamed()) {
 							living.recentlyHit = 100;

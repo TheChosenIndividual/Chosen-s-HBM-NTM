@@ -20,10 +20,10 @@ import com.hbm.interfaces.IArmorModDash;
 import com.hbm.items.armor.ArmorFSB;
 import com.hbm.lib.ModDamageSource;
 import com.hbm.main.MainRegistry;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
+import com.hbm.packet.toclient.ExtPropPacket;
 import com.hbm.potion.HbmPotion;
-import com.hbm.packet.ExtPropPacket;
 import com.hbm.saveddata.AuxSavedData;
 import com.hbm.util.ArmorRegistry;
 import com.hbm.util.ArmorUtil;
@@ -77,13 +77,13 @@ public class EntityEffectHandler {
 			HbmPlayerProps pprps = HbmPlayerProps.getData((EntityPlayerMP) entity);
 			NBTTagCompound data = new NBTTagCompound();
 
-			if(pprps.shield < pprps.maxShield && entity.ticksExisted > pprps.lastDamage + 60) {
+			if(pprps.shield < pprps.getEffectiveMaxShield() && entity.ticksExisted > pprps.lastDamage + 60) {
 				int tsd = entity.ticksExisted - (pprps.lastDamage + 60);
-				pprps.shield += Math.min(pprps.maxShield - pprps.shield, 0.005F * tsd);
+				pprps.shield += Math.min(pprps.getEffectiveMaxShield() - pprps.shield, 0.005F * tsd);
 			}
 
-			if(pprps.shield > pprps.maxShield)
-				pprps.shield = pprps.maxShield;
+			if(pprps.shield > pprps.getEffectiveMaxShield())
+				pprps.shield = pprps.getEffectiveMaxShield();
 
 			props.saveNBTData(data);
 			pprps.saveNBTData(data);
@@ -99,8 +99,8 @@ public class EntityEffectHandler {
 					ExplosionNukeSmall.explode(entity.worldObj, entity.posX, entity.posY, entity.posZ, ExplosionNukeSmall.PARAMS_MEDIUM);
 				}
 			}
-	
-			if(GeneralConfig.enable528 && entity instanceof EntityLivingBase && !entity.isImmuneToFire() && entity.worldObj.provider.isHellWorld) {
+			//only sets players on fire so mod compatibility doesnt die
+			if((GeneralConfig.enable528 && GeneralConfig.enable528NetherBurn) && entity instanceof EntityPlayer && !entity.isImmuneToFire() && entity.worldObj.provider.isHellWorld) {
 				entity.setFire(5);
 			}
 			
@@ -670,13 +670,14 @@ public class EntityEffectHandler {
 						player.addVelocity(lookingIn.xCoord * forward + strafeVec.xCoord * strafe, 0, lookingIn.zCoord * forward + strafeVec.zCoord * strafe);
 						player.motionY = 0;
 						player.fallDistance = 0F;
-						player.playSound("hbm:player.dash", 1.0F, 1.0F);
+						player.playSound("hbm:weapon.rocketFlame", 1.0F, 1.0F);
 						
 						props.setDashCooldown(HbmPlayerProps.dashCooldownLength);
 						stamina -= perDash;
 					}
 				} else {	
 					props.setDashCooldown(props.getDashCooldown() - 1);
+					props.setKeyPressed(EnumKeybind.DASH, false);
 				}
 						
 				if(stamina < props.getDashCount() * perDash) {
@@ -684,7 +685,7 @@ public class EntityEffectHandler {
 					
 					if(stamina % perDash == perDash-1) {
 						
-						player.playSound("hbm:player.dashRecharge", 1.0F, (1.0F + ((1F/12F)*(stamina/perDash))));
+						player.playSound("hbm:item.techBoop", 1.0F, (1.0F + ((1F/12F)*(stamina/perDash))));
 						stamina++;
 					}
 				}

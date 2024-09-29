@@ -10,7 +10,7 @@ import com.hbm.interfaces.IAnimatedDoor;
 import com.hbm.lib.Library;
 import com.hbm.main.MainRegistry;
 import com.hbm.packet.PacketDispatcher;
-import com.hbm.packet.TEDoorAnimationPacket;
+import com.hbm.packet.toclient.TEDoorAnimationPacket;
 import com.hbm.sound.AudioWrapper;
 import com.hbm.tileentity.machine.TileEntityLockableBase;
 import com.hbm.util.fauxpointtwelve.BlockPos;
@@ -167,7 +167,7 @@ public class TileEntityDoorGeneric extends TileEntityLockableBase implements IAn
 	
 	public DoorDecl getDoorType(){
 		
-		if(this.doorType == null)
+		if(this.doorType == null && this.getBlockType() instanceof BlockDoorGeneric)
 			this.doorType = ((BlockDoorGeneric)this.getBlockType()).type;
 		
 		return this.doorType;

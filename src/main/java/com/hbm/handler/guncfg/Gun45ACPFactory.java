@@ -6,16 +6,15 @@ import com.hbm.handler.BulletConfiguration;
 import com.hbm.handler.GunConfiguration;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.items.ModItems;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.items.ItemAmmoEnums.Ammo45ACP;
 import com.hbm.lib.HbmCollection;
 import com.hbm.lib.HbmCollection.EnumGunManufacturer;
 import com.hbm.particle.SpentCasing;
 import com.hbm.particle.SpentCasing.CasingType;
 import com.hbm.render.anim.BusAnimation;
-import com.hbm.render.anim.BusAnimationKeyframe;
 import com.hbm.render.anim.BusAnimationSequence;
 import com.hbm.render.anim.HbmAnimations.AnimType;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
 
 public class Gun45ACPFactory {
 	
@@ -81,12 +80,12 @@ public class Gun45ACPFactory {
 
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("SLIDE", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 10)// Wait for hammer
-						.addKeyframePosition(0, 0, -3.5, 40)// Slide back
-						.addKeyframePosition(0, 0, 0, 40))// Return
+						.addPos(0, 0, 0, 10)// Wait for hammer
+						.addPos(0, 0, -3.5, 40)// Slide back
+						.addPos(0, 0, 0, 40))// Return
 				.addBus("HAMMER", new BusAnimationSequence()
-						.addKeyframePosition(15, 0, 0, 10)
-						.addKeyframePosition(0, 0, 0, 40)));
+						.addPos(15, 0, 0, 10)
+						.addPos(0, 0, 0, 40)));
 
 		return config;
 	}

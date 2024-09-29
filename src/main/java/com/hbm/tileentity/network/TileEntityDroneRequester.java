@@ -9,6 +9,7 @@ import com.hbm.inventory.RecipesCommon.OreDictStack;
 import com.hbm.inventory.container.ContainerDroneRequester;
 import com.hbm.inventory.gui.GUIDroneRequester;
 import com.hbm.module.ModulePatternMatcher;
+import com.hbm.tileentity.IControlReceiverFilter;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.INBTPacketReceiver;
 import com.hbm.tileentity.network.RequestNetwork.PathNode;
@@ -17,15 +18,15 @@ import com.hbm.util.fauxpointtwelve.BlockPos;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 import net.minecraftforge.oredict.OreDictionary;
 
-public class TileEntityDroneRequester extends TileEntityRequestNetworkContainer implements INBTPacketReceiver, IGUIProvider {
+public class TileEntityDroneRequester extends TileEntityRequestNetworkContainer implements INBTPacketReceiver, IGUIProvider, IControlReceiverFilter {
 	
 	public ModulePatternMatcher matcher;
 
@@ -55,7 +56,8 @@ public class TileEntityDroneRequester extends TileEntityRequestNetworkContainer 
 	public void networkUnpack(NBTTagCompound nbt) {
 		this.matcher.readFromNBT(nbt);
 	}
-	
+
+	@Override
 	public void nextMode(int i) {
 		this.matcher.nextMode(worldObj, slots[i], i);
 	}
@@ -94,7 +96,7 @@ public class TileEntityDroneRequester extends TileEntityRequestNetworkContainer 
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUIDroneRequester(player.inventory, this);
 	}
 
@@ -121,5 +123,15 @@ public class TileEntityDroneRequester extends TileEntityRequestNetworkContainer 
 			if(stock == null || !this.matcher.isValidForFilter(filter, i, stock)) request.add(aStack);
 		}
 		return new RequestNode(pos, this.reachableNodes, request);
+	}
+
+	@Override
+	public boolean hasPermission(EntityPlayer player) {
+		return Vec3.createVectorHelper(xCoord - player.posX, yCoord - player.posY, zCoord - player.posZ).lengthVector() < 20;
+	}
+
+	@Override
+	public int[] getFilterSlots() {
+		return new int[]{0,9};
 	}
 }

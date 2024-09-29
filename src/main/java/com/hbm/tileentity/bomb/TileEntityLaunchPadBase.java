@@ -1,13 +1,25 @@
 package com.hbm.tileentity.bomb;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
+import com.hbm.handler.CompatHandler;
+import com.hbm.tileentity.IFluidCopiable;
+import cpw.mods.fml.common.Optional;
+import li.cil.oc.api.machine.Arguments;
+import li.cil.oc.api.machine.Callback;
+import li.cil.oc.api.machine.Context;
+import li.cil.oc.api.network.SimpleComponent;
 import org.apache.logging.log4j.Level;
 
 import com.hbm.config.GeneralConfig;
-import com.hbm.entity.missile.EntityMissileAntiBallistic;
-import com.hbm.entity.missile.EntityMissileBaseNT;
+import com.hbm.entity.missile.*;
+import com.hbm.entity.missile.EntityMissileTier0.*;
+import com.hbm.entity.missile.EntityMissileTier1.*;
+import com.hbm.entity.missile.EntityMissileTier2.*;
+import com.hbm.entity.missile.EntityMissileTier3.*;
+import com.hbm.entity.missile.EntityMissileTier4.*;
 import com.hbm.interfaces.IBomb.BombReturnCode;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.inventory.container.ContainerLaunchPadLarge;
@@ -22,25 +34,68 @@ import com.hbm.main.MainRegistry;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.IRadarCommandReceiver;
 import com.hbm.tileentity.TileEntityMachineBase;
+import com.hbm.util.TrackerUtil;
 import com.hbm.util.fauxpointtwelve.BlockPos;
+import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidStandardReceiver;
 import api.hbm.item.IDesignatorItem;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.MathHelper;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.ForgeDirection;
 
-public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase implements IEnergyUser, IFluidStandardReceiver, IGUIProvider, IRadarCommandReceiver {
+@Optional.InterfaceList({@Optional.Interface(iface = "li.cil.oc.api.network.SimpleComponent", modid = "OpenComputers")})
+public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase implements IEnergyReceiverMK2, IFluidStandardReceiver, IGUIProvider, IRadarCommandReceiver, SimpleComponent, CompatHandler.OCComponent, IFluidCopiable {
+	
+	/** Automatic instantiation of generic missiles, i.e. everything that both extends EntityMissileBaseNT and needs a designator */
+	public static final HashMap<ComparableStack, Class<? extends EntityMissileBaseNT>> missiles = new HashMap();
+	
+	public static void registerLaunchables() {
+
+		//Tier 0
+		missiles.put(new ComparableStack(ModItems.missile_test), EntityMissileTest.class);
+		missiles.put(new ComparableStack(ModItems.missile_micro), EntityMissileMicro.class);
+		missiles.put(new ComparableStack(ModItems.missile_schrabidium), EntityMissileSchrabidium.class);
+		missiles.put(new ComparableStack(ModItems.missile_bhole), EntityMissileBHole.class);
+		missiles.put(new ComparableStack(ModItems.missile_taint), EntityMissileTaint.class);
+		missiles.put(new ComparableStack(ModItems.missile_emp), EntityMissileEMP.class);
+		//Tier 1
+		missiles.put(new ComparableStack(ModItems.missile_generic), EntityMissileGeneric.class);
+		missiles.put(new ComparableStack(ModItems.missile_decoy), EntityMissileDecoy.class);
+		missiles.put(new ComparableStack(ModItems.missile_incendiary), EntityMissileIncendiary.class);
+		missiles.put(new ComparableStack(ModItems.missile_cluster), EntityMissileCluster.class);
+		missiles.put(new ComparableStack(ModItems.missile_buster), EntityMissileBunkerBuster.class);
+		//Tier 2
+		missiles.put(new ComparableStack(ModItems.missile_strong), EntityMissileStrong.class);
+		missiles.put(new ComparableStack(ModItems.missile_incendiary_strong), EntityMissileIncendiaryStrong.class);
+		missiles.put(new ComparableStack(ModItems.missile_cluster_strong), EntityMissileClusterStrong.class);
+		missiles.put(new ComparableStack(ModItems.missile_buster_strong), EntityMissileBusterStrong.class);
+		missiles.put(new ComparableStack(ModItems.missile_emp_strong), EntityMissileEMPStrong.class);
+		//Tier 3
+		missiles.put(new ComparableStack(ModItems.missile_burst), EntityMissileBurst.class);
+		missiles.put(new ComparableStack(ModItems.missile_inferno), EntityMissileInferno.class);
+		missiles.put(new ComparableStack(ModItems.missile_rain), EntityMissileRain.class);
+		missiles.put(new ComparableStack(ModItems.missile_drill), EntityMissileDrill.class);
+		missiles.put(new ComparableStack(ModItems.missile_shuttle), EntityMissileShuttle.class);
+		//Tier 4
+		missiles.put(new ComparableStack(ModItems.missile_nuclear), EntityMissileNuclear.class);
+		missiles.put(new ComparableStack(ModItems.missile_nuclear_cluster), EntityMissileMirv.class);
+		missiles.put(new ComparableStack(ModItems.missile_volcano), EntityMissileVolcano.class);
+		missiles.put(new ComparableStack(ModItems.missile_doomsday), EntityMissileDoomsday.class);
+		
+		missiles.put(new ComparableStack(ModItems.missile_stealth), EntityMissileStealth.class);
+	}
 
 	public ItemStack toRender;
 	
@@ -50,6 +105,11 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 	public int prevRedstonePower;
 	public int redstonePower;
 	public Set<BlockPos> activatedBlocks = new HashSet<>(4);
+	
+	public int state = 0;
+	public static final int STATE_MISSING = 0;
+	public static final int STATE_LOADING = 1;
+	public static final int STATE_READY = 2;
 	
 	public FluidTank[] tanks;
 
@@ -64,13 +124,38 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 	public String getName() {
 		return "container.launchPad";
 	}
+
+	@Override
+	public boolean canExtractItem(int slot, ItemStack itemStack, int side) {
+		return false;
+	}
+
+	@Override
+	public int[] getAccessibleSlotsFromSide(int side) {
+		return new int[] { 0 };
+	}
+
+	@Override
+	public boolean isItemValidForSlot(int slot, ItemStack stack) {
+		return slot == 0 && this.isMissileValid(stack);
+	}
+	
+	public abstract DirPos[] getConPos();
 	
 	@Override
 	public void updateEntity() {
 		
 		if(!worldObj.isRemote) {
 			
-			if(this.redstonePower > 0 && this.prevRedstonePower == 0) {
+			if(worldObj.getTotalWorldTime() % 20 == 0) {
+				for(DirPos pos : getConPos()) {
+					this.trySubscribe(worldObj, pos.getX(), pos.getY(), pos.getZ(), pos.getDir());
+					if(tanks[0].getTankType() != Fluids.NONE) this.trySubscribe(tanks[0].getTankType(), worldObj, pos.getX(), pos.getY(), pos.getZ(), pos.getDir());
+					if(tanks[1].getTankType() != Fluids.NONE) this.trySubscribe(tanks[1].getTankType(), worldObj, pos.getX(), pos.getY(), pos.getZ(), pos.getDir());
+				}
+			}
+			
+			if(this.redstonePower > 0 && this.prevRedstonePower <= 0) {
 				this.launchFromDesignator();
 			}
 			
@@ -79,6 +164,13 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 			this.power = Library.chargeTEFromItems(slots, 2, power, maxPower);
 			tanks[0].loadTank(3, 4, slots);
 			tanks[1].loadTank(5, 6, slots);
+			
+			if(this.isMissileValid()) {
+				if(slots[0].getItem() instanceof ItemMissile) {
+					ItemMissile missile = (ItemMissile) slots[0].getItem();
+					setFuel(missile);
+				}
+			}
 
 			this.networkPackNT(250);
 		}
@@ -89,6 +181,7 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 		super.serialize(buf);
 		
 		buf.writeLong(this.power);
+		buf.writeInt(this.state);
 		tanks[0].serialize(buf);
 		tanks[1].serialize(buf);
 		
@@ -106,6 +199,7 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 		super.deserialize(buf);
 		
 		this.power = buf.readLong();
+		this.state = buf.readInt();
 		tanks[0].deserialize(buf);
 		tanks[1].deserialize(buf);
 		
@@ -176,6 +270,10 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 	@Override public long getMaxPower() { return maxPower; }
 	@Override public FluidTank[] getAllTanks() { return this.tanks; }
 	@Override public FluidTank[] getReceivingTanks() { return this.tanks; }
+	
+	@Override public boolean canConnect(ForgeDirection dir) {
+		return dir != ForgeDirection.UP && dir != ForgeDirection.DOWN;
+	}
 
 	@Override
 	public Container provideContainer(int ID, EntityPlayer player, World world, int x, int y, int z) {
@@ -184,7 +282,7 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUILaunchPadLarge(player.inventory, this);
 	}
 	
@@ -193,11 +291,11 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 		switch(missile.fuel) {
 		case ETHANOL_PEROXIDE:
 			tanks[0].setTankType(Fluids.ETHANOL);
-			tanks[1].setTankType(Fluids.ACID);
+			tanks[1].setTankType(Fluids.PEROXIDE);
 			break;
 		case KEROSENE_PEROXIDE:
 			tanks[0].setTankType(Fluids.KEROSENE);
-			tanks[1].setTankType(Fluids.ACID);
+			tanks[1].setTankType(Fluids.PEROXIDE);
 			break;
 		case KEROSENE_LOXY:
 			tanks[0].setTankType(Fluids.KEROSENE);
@@ -212,7 +310,11 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 	
 	/** Requires the missile slot to be non-null and he item to be compatible */
 	public boolean isMissileValid() {
-		return slots[0] != null && slots[0].getItem() instanceof ItemMissile;
+		return slots[0] != null && isMissileValid(slots[0]);
+	}
+	
+	public boolean isMissileValid(ItemStack stack) {
+		return stack.getItem() instanceof ItemMissile && ((ItemMissile) stack.getItem()).launchable;
 	}
 	
 	public boolean hasFuel() {
@@ -233,21 +335,22 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 		
 		if(slots[0] == null) return null;
 		
-		Class<? extends EntityMissileBaseNT> clazz = TileEntityLaunchPad.missiles.get(new ComparableStack(slots[0]).makeSingular());
+		Class<? extends EntityMissileBaseNT> clazz = TileEntityLaunchPadBase.missiles.get(new ComparableStack(slots[0]).makeSingular());
 		
 		if(clazz != null) {
 			try {
-				EntityMissileBaseNT missile = clazz.getConstructor(World.class, float.class, float.class, float.class, int.class, int.class).newInstance(worldObj, xCoord + 0.5F, yCoord + 2F, zCoord + 0.5F, targetX, targetZ);
+				EntityMissileBaseNT missile = clazz.getConstructor(World.class, float.class, float.class, float.class, int.class, int.class).newInstance(worldObj, xCoord + 0.5F, yCoord + (float) getLaunchOffset() /* Position arguments need to be floats, jackass */, zCoord + 0.5F, targetX, targetZ);
 				if(GeneralConfig.enableExtendedLogging) MainRegistry.logger.log(Level.INFO, "[MISSILE] Tried to launch missile at " + xCoord + " / " + yCoord + " / " + zCoord + " to " + xCoord + " / " + zCoord + "!");
+				missile.getDataWatcher().updateObject(3, (byte) MathHelper.clamp_int(this.getBlockMetadata() - 10, 2, 5));
 				return missile;
 			} catch(Exception e) { }
 		}
 
 		if(slots[0].getItem() == ModItems.missile_anti_ballistic) {
 			EntityMissileAntiBallistic missile = new EntityMissileAntiBallistic(worldObj);
-			missile.posX = xCoord + 0.5F;
-			missile.posY = yCoord + 2F;
-			missile.posZ = zCoord + 0.5F;
+			missile.posX = xCoord + 0.5D;
+			missile.posY = yCoord + getLaunchOffset();
+			missile.posZ = zCoord + 0.5D;
 			return missile;
 		}
 		
@@ -256,6 +359,7 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 	
 	public void finalizeLaunch(Entity missile) {
 		worldObj.spawnEntityInWorld(missile);
+		TrackerUtil.setTrackingRange(worldObj, missile, 500);
 		worldObj.playSoundEffect(xCoord + 0.5, yCoord, zCoord + 0.5, "hbm:weapon.missileTakeOff", 2.0F, 1.0F);
 
 		this.power -= 75_000;
@@ -278,7 +382,6 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 		int targetZ = 0;
 		
 		if(slots[1] != null && slots[1].getItem() instanceof IDesignatorItem) {
-			
 			IDesignatorItem designator = (IDesignatorItem) slots[1].getItem();
 			
 			if(!designator.isReady(worldObj, slots[1], xCoord, yCoord, zCoord) && needsDesignator) return BombReturnCode.ERROR_MISSING_COMPONENT;
@@ -365,4 +468,101 @@ public abstract class TileEntityLaunchPadBase extends TileEntityMachineBase impl
 	
 	/** Any extra conditions for launching in addition to the missile being valid and fueled */
 	public abstract boolean isReadyForLaunch();
+	public abstract double getLaunchOffset();
+
+	// do some opencomputer stuff
+	@Override
+	@Optional.Method(modid = "OpenComputers")
+	public String getComponentName() {
+		return "ntm_launch_pad";
+	}
+
+	@Callback(direct = true)
+	@Optional.Method(modid = "OpenComputers")
+	public Object[] getEnergyInfo(Context context, Arguments args) {
+		return new Object[] {getPower(), getMaxPower()};
+	}
+
+	@Callback(direct = true)
+	@Optional.Method(modid = "OpenComputers")
+	public Object[] getFluid(Context context, Arguments args) {
+		return new Object[] {
+				this.tanks[0].getFill(), this.tanks[0].getMaxFill(), this.tanks[0].getTankType().getUnlocalizedName(),
+				this.tanks[1].getFill(), this.tanks[1].getMaxFill(), this.tanks[1].getTankType().getUnlocalizedName()
+		};
+	}
+
+	@Callback(direct = true)
+	@Optional.Method(modid = "OpenComputers")
+	public Object[] canLaunch(Context context, Arguments args) {
+		return new Object[] {canLaunch()};
+	}
+
+	@Callback(direct = true)
+	@Optional.Method(modid = "OpenComputers")
+	public Object[] getTier(Context context, Arguments args) {
+		if(!isMissileValid())
+			return new Object[] {};
+		ItemMissile missile = (ItemMissile) slots[0].getItem();
+		if(missile.tier == ItemMissile.MissileTier.TIER0)
+			return new Object[] {0};
+		if(missile.tier == ItemMissile.MissileTier.TIER1)
+			return new Object[] {1};
+		if(missile.tier == ItemMissile.MissileTier.TIER2)
+			return new Object[] {2};
+		if(missile.tier == ItemMissile.MissileTier.TIER3)
+			return new Object[] {3};
+		if(missile.tier == ItemMissile.MissileTier.TIER4)
+			return new Object[] {4};
+		return new Object[] {5}; // unknown tier
+	}
+
+	@Callback
+	@Optional.Method(modid = "OpenComputers")
+	public Object[] launch(Context context, Arguments args) {
+		if(canLaunch()) {
+			return new Object[] {sendCommandPosition(args.checkInteger(0), -1 /*unused anyway*/, args.checkInteger(1))};
+		}
+		return new Object[] {false};
+	}
+
+	@Override
+	@Optional.Method(modid = "OpenComputers")
+	public String[] methods() {
+		return new String[] {
+				"getEnergyInfo",
+				"getFluid",
+				"canLaunch",
+				"getTier",
+				"launch"
+		};
+	}
+
+	@Override
+	@Optional.Method(modid = "OpenComputers")
+	public Object[] invoke(String method, Context context, Arguments args) throws Exception {
+		switch(method) {
+			case ("getEnergyInfo"):
+				return getEnergyInfo(context, args);
+			case ("getFluid"):
+				return getFluid(context, args);
+			case ("canLaunch"):
+				return canLaunch(context, args);
+			case ("getTier"):
+				return getTier(context, args);
+			case ("launch"):
+				return launch(context, args);
+		}
+	throw new NoSuchMethodException();
+	}
+
+	@Override
+	public int[] getFluidIDToCopy() {
+		return new int[]{tanks[0].getTankType().getID(), tanks[1].getTankType().getID()};
+	}
+
+	@Override
+	public FluidTank getTankToPaste() {
+		return null;
+	}
 }

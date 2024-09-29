@@ -6,6 +6,7 @@ import org.lwjgl.opengl.GL12;
 import com.hbm.extprop.HbmPlayerProps;
 import com.hbm.interfaces.Spaghetti;
 import com.hbm.interfaces.Untested;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.lib.RefStrings;
 
 import net.minecraft.client.Minecraft;
@@ -230,11 +231,10 @@ public class RenderScreenOverlay {
 					int bar = barID;
 					if(stamina % 30 >= 25) 
 						bar++;
-					int yPos = y;
 					if(bar / 3 != y)
 						y++;
 					bar = bar % 3;
-					gui.drawTexturedModalRect(posX + (width+2)*bar, posY - 12*y, 76, 58, width, 10);
+					gui.drawTexturedModalRect(posX + (width + 2) * bar, posY - 12 * y, 76, 58, width, 10);
 					fadeOut -= 0.04F;
 					GL11.glColor4f(1F, 1F, 1F, 1F);
 				}
@@ -297,7 +297,7 @@ public class RenderScreenOverlay {
 
 		Minecraft.getMinecraft().renderEngine.bindTexture(misc);
 		gui.drawTexturedModalRect(left, top, 146, 0, 81, 9);
-		int i = (int) Math.ceil(props.shield * 79 / props.maxShield);
+		int i = (int) Math.ceil(props.shield * 79 / props.getEffectiveMaxShield());
 		gui.drawTexturedModalRect(left + 1, top, 147, 9, i, 9);
 		
 		String label = "" + ((int) (props.shield * 10F)) / 10D;
@@ -353,37 +353,4 @@ public class RenderScreenOverlay {
 		GL11.glEnable(GL11.GL_ALPHA_TEST);
 		GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
 	}
-	
-	public enum Crosshair {
-
-		NONE(0, 0, 0),
-		CROSS(1, 55, 16),
-		CIRCLE(19, 55, 16),
-		SEMI(37, 55, 16),
-		KRUCK(55, 55, 16),
-		DUAL(1, 73, 16),
-		SPLIT(19, 73, 16),
-		CLASSIC(37, 73, 16),
-		BOX(55, 73, 16),
-		L_CROSS(0, 90, 32),
-		L_KRUCK(32, 90, 32),
-		L_CLASSIC(64, 90, 32),
-		L_CIRCLE(96, 90, 32),
-		L_SPLIT(0, 122, 32),
-		L_ARROWS(32, 122, 32),
-		L_BOX(64, 122, 32),
-		L_CIRCUMFLEX(96, 122, 32),
-		L_RAD(0, 154, 32);
-		
-		public int x;
-		public int y;
-		public int size;
-		
-		private Crosshair(int x, int y, int size) {
-			this.x = x;
-			this.y = y;
-			this.size = size;
-		}
-	}
-
 }

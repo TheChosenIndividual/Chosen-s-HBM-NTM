@@ -7,18 +7,16 @@ import com.hbm.handler.GunConfiguration;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
 import com.hbm.items.ItemAmmoEnums.Ammo75Bolt;
 import com.hbm.items.ModItems;
+import com.hbm.items.weapon.sedna.Crosshair;
 import com.hbm.lib.HbmCollection;
 import com.hbm.lib.HbmCollection.EnumGunManufacturer;
 import com.hbm.lib.ModDamageSource;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 import com.hbm.potion.HbmPotion;
 import com.hbm.render.anim.BusAnimation;
-import com.hbm.render.anim.BusAnimationKeyframe;
 import com.hbm.render.anim.BusAnimationSequence;
 import com.hbm.render.anim.HbmAnimations.AnimType;
-import com.hbm.render.util.RenderScreenOverlay.Crosshair;
-
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.nbt.NBTTagCompound;
@@ -49,25 +47,25 @@ public class Gun75BoltFactory {
 		
 		config.animations.put(AnimType.CYCLE, new BusAnimation()
 				.addBus("RECOIL", new BusAnimationSequence()
-						.addKeyframePosition(1, 0, 0, 25)
-						.addKeyframePosition(0, 0, 0, 75)
+						.addPos(1, 0, 0, 25)
+						.addPos(0, 0, 0, 75)
 						)
 				.addBus("EJECT", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 0, 25)
-						.addKeyframePosition(0, 0, 1, 75)
+						.addPos(0, 0, 0, 25)
+						.addPos(0, 0, 1, 75)
 						)
 				);
 		
 		config.animations.put(AnimType.RELOAD, new BusAnimation()
 				.addBus("TILT", new BusAnimationSequence()
-						.addKeyframePosition(1, 0, 0, 250)
-						.addKeyframePosition(1, 0, 0, 1500)
-						.addKeyframePosition(0, 0, 0, 250)
+						.addPos(1, 0, 0, 250)
+						.addPos(1, 0, 0, 1500)
+						.addPos(0, 0, 0, 250)
 						)
 				.addBus("MAG", new BusAnimationSequence()
-						.addKeyframePosition(0, 0, 1, 500)
-						.addKeyframePosition(1, 0, 1, 500)
-						.addKeyframePosition(0, 0, 0, 500)
+						.addPos(0, 0, 1, 500)
+						.addPos(1, 0, 1, 500)
+						.addPos(0, 0, 0, 500)
 						)
 				);
 		

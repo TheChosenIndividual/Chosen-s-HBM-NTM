@@ -9,8 +9,8 @@ import com.hbm.items.ModItems;
 import com.hbm.items.ItemAmmoEnums.AmmoFatman;
 import com.hbm.lib.ModDamageSource;
 import com.hbm.main.MainRegistry;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 import com.hbm.util.ContaminationUtil;
 import com.hbm.util.ContaminationUtil.ContaminationType;
 import com.hbm.util.ContaminationUtil.HazardType;
@@ -64,7 +64,6 @@ public class EntityCreeperNuclear extends EntityCreeper {
 
 	@Override
 	protected void dropFewItems(boolean p_70628_1_, int p_70628_2_) {
-
 		super.dropFewItems(p_70628_1_, p_70628_2_);
 
 		if(rand.nextInt(3) == 0)
@@ -120,7 +119,7 @@ public class EntityCreeperNuclear extends EntityCreeper {
 				worldObj.playSoundEffect(posX, posY + 0.5, posZ, "hbm:weapon.mukeExplosion", 15.0F, 1.0F);
 
 				if(flag) {
-					worldObj.spawnEntityInWorld(EntityNukeExplosionMK5.statFac(worldObj, 50, posX, posY, posZ).mute());
+					worldObj.spawnEntityInWorld(EntityNukeExplosionMK5.statFac(worldObj, 50, posX, posY, posZ));
 				} else {
 					ExplosionNukeGeneric.dealDamage(worldObj, posX, posY + 0.5, posZ, 100);
 				}

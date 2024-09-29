@@ -1,12 +1,12 @@
 package com.hbm.blocks.network;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
 import com.hbm.blocks.IBlockMultiPass;
 import com.hbm.blocks.ILookOverlay;
 import com.hbm.blocks.ITooltipProvider;
+import com.hbm.handler.CompatHandler;
 import com.hbm.lib.RefStrings;
 import com.hbm.render.block.RenderBlockMultipass;
 import com.hbm.tileentity.INBTPacketReceiver;
@@ -14,8 +14,14 @@ import com.hbm.tileentity.network.TileEntityCableBaseNT;
 import com.hbm.util.BobMathUtil;
 import com.hbm.util.I18nUtil;
 
+import api.hbm.energymk2.PowerNetMK2;
+import cpw.mods.fml.common.Optional;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import li.cil.oc.api.machine.Arguments;
+import li.cil.oc.api.machine.Callback;
+import li.cil.oc.api.machine.Context;
+import li.cil.oc.api.network.SimpleComponent;
 import net.minecraft.block.BlockContainer;
 import net.minecraft.block.BlockPistonBase;
 import net.minecraft.block.material.Material;
@@ -98,9 +104,9 @@ public class BlockCableGauge extends BlockContainer implements IBlockMultiPass, 
 		return IBlockMultiPass.getRenderType();
 	}
 
-	public static class TileEntityCableGauge extends TileEntityCableBaseNT implements INBTPacketReceiver {
+	@Optional.InterfaceList({@Optional.Interface(iface = "li.cil.oc.api.network.SimpleComponent", modid = "OpenComputers")})
+	public static class TileEntityCableGauge extends TileEntityCableBaseNT implements INBTPacketReceiver, SimpleComponent, CompatHandler.OCComponent {
 
-		private BigInteger lastMeasurement = BigInteger.valueOf(10);
 		private long deltaTick = 0;
 		private long deltaSecond = 0;
 		private long deltaLastSecond = 0;
@@ -111,20 +117,16 @@ public class BlockCableGauge extends BlockContainer implements IBlockMultiPass, 
 
 			if(!worldObj.isRemote) {
 				
-				if(network != null) {
-					BigInteger total = network.getTotalTransfer();
-					BigInteger delta = total.subtract(this.lastMeasurement);
-					this.lastMeasurement = total;
+				if(this.node != null && this.node.net != null) {
 					
-					try {
-						this.deltaTick = delta.longValueExact();
-						if(worldObj.getTotalWorldTime() % 20 == 0) {
-							this.deltaLastSecond = this.deltaSecond;
-							this.deltaSecond = 0;
-						}
-						this.deltaSecond += deltaTick;
-						
-					} catch(Exception ex) { }
+					PowerNetMK2 net = this.node.net;
+					
+					this.deltaTick = net.energyTracker;
+					if(worldObj.getTotalWorldTime() % 20 == 0) {
+						this.deltaLastSecond = this.deltaSecond;
+						this.deltaSecond = 0;
+					}
+					this.deltaSecond += deltaTick;
 				}
 				
 				NBTTagCompound data = new NBTTagCompound();
@@ -138,6 +140,24 @@ public class BlockCableGauge extends BlockContainer implements IBlockMultiPass, 
 		public void networkUnpack(NBTTagCompound nbt) {
 			this.deltaTick = Math.max(nbt.getLong("deltaT"), 0);
 			this.deltaLastSecond = Math.max(nbt.getLong("deltaS"), 0);
+		}
+
+		@Override
+		@Optional.Method(modid = "OpenComputers")
+		public String getComponentName() {
+			return "ntm_power_gauge";
+		}
+
+		@Callback(direct = true)
+		@Optional.Method(modid = "OpenComputers")
+		public Object[] getTransfer(Context context, Arguments args) {
+			return new Object[] {deltaTick, deltaSecond};
+		}
+
+		@Callback(direct = true)
+		@Optional.Method(modid = "OpenComputers")
+		public Object[] getInfo(Context context, Arguments args) {
+			return new Object[] {deltaTick, deltaSecond, xCoord, yCoord, zCoord};
 		}
 	}
 }

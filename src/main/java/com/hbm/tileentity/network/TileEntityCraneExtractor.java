@@ -2,16 +2,16 @@ package com.hbm.tileentity.network;
 
 import api.hbm.conveyor.IConveyorBelt;
 import com.hbm.entity.item.EntityMovingItem;
-import com.hbm.interfaces.IControlReceiver;
 import com.hbm.inventory.container.ContainerCraneExtractor;
 import com.hbm.inventory.gui.GUICraneExtractor;
 import com.hbm.items.ModItems;
 import com.hbm.module.ModulePatternMatcher;
+import com.hbm.tileentity.IControlReceiverFilter;
 import com.hbm.tileentity.IGUIProvider;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.block.Block;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IInventory;
@@ -24,7 +24,7 @@ import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityCraneExtractor extends TileEntityCraneBase implements IGUIProvider, IControlReceiver {
+public class TileEntityCraneExtractor extends TileEntityCraneBase implements IGUIProvider, IControlReceiverFilter {
 	
 	public boolean isWhitelist = false;
 	public ModulePatternMatcher matcher;
@@ -154,12 +154,23 @@ public class TileEntityCraneExtractor extends TileEntityCraneBase implements IGU
 					}
 				}
 			}
-			
-			NBTTagCompound data = new NBTTagCompound();
-			data.setBoolean("isWhitelist", isWhitelist);
-			this.matcher.writeToNBT(data);
-			this.networkPack(data, 15);
+
+			this.networkPackNT(15);
 		}
+	}
+
+	@Override
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeBoolean(isWhitelist);
+		this.matcher.serialize(buf);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		isWhitelist = buf.readBoolean();
+		this.matcher.deserialize(buf);
 	}
 	
 	public static int[] masquerade(ISidedInventory sided, int side) {
@@ -169,14 +180,6 @@ public class TileEntityCraneExtractor extends TileEntityCraneBase implements IGU
 		}
 		
 		return sided.getAccessibleSlotsFromSide(side);
-	}
-	
-	public void networkUnpack(NBTTagCompound nbt) {
-		super.networkUnpack(nbt);
-		
-		this.isWhitelist = nbt.getBoolean("isWhitelist");
-		this.matcher.modes = new String[this.matcher.modes.length];
-		this.matcher.readFromNBT(nbt);
 	}
 	
 	public boolean matchesFilter(ItemStack stack) {
@@ -191,7 +194,8 @@ public class TileEntityCraneExtractor extends TileEntityCraneBase implements IGU
 		
 		return false;
 	}
-	
+
+	@Override
 	public void nextMode(int i) {
 		this.matcher.nextMode(worldObj, slots[i], i);
 	}
@@ -218,7 +222,7 @@ public class TileEntityCraneExtractor extends TileEntityCraneBase implements IGU
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUICraneExtractor(player.inventory, this);
 	}
 	
@@ -246,5 +250,14 @@ public class TileEntityCraneExtractor extends TileEntityCraneBase implements IGU
 		if(data.hasKey("whitelist")) {
 			this.isWhitelist = !this.isWhitelist;
 		}
+		if(data.hasKey("slot")){
+			setFilterContents(data);
+		}
+	}
+
+	@Override
+	public int[] getFilterSlots() {
+		return new int[]{0,9};
 	}
 }
+

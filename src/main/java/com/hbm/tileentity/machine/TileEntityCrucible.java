@@ -18,11 +18,13 @@ import com.hbm.inventory.material.NTMMaterial;
 import com.hbm.inventory.recipes.CrucibleRecipes;
 import com.hbm.inventory.recipes.CrucibleRecipes.CrucibleRecipe;
 import com.hbm.items.ModItems;
-import com.hbm.packet.AuxParticlePacketNT;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toclient.AuxParticlePacketNT;
 import com.hbm.tileentity.IConfigurableMachine;
 import com.hbm.tileentity.IGUIProvider;
+import com.hbm.tileentity.IMetalCopiable;
 import com.hbm.tileentity.TileEntityMachineBase;
+import com.hbm.util.BobMathUtil;
 import com.hbm.util.CrucibleUtil;
 
 import api.hbm.block.ICrucibleAcceptor;
@@ -30,7 +32,7 @@ import api.hbm.tile.IHeatSource;
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
@@ -44,7 +46,7 @@ import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityCrucible extends TileEntityMachineBase implements IGUIProvider, ICrucibleAcceptor, IConfigurableMachine {
+public class TileEntityCrucible extends TileEntityMachineBase implements IGUIProvider, ICrucibleAcceptor, IConfigurableMachine, IMetalCopiable {
 
 	public int heat;
 	public int progress;
@@ -172,7 +174,7 @@ public class TileEntityCrucible extends TileEntityMachineBase implements IGUIPro
 				
 				}
 
-				PollutionHandler.incrementPollution(worldObj, xCoord, yCoord, zCoord, PollutionType.SOOT, PollutionHandler.SOOT_PER_SECOND / 2F);
+				PollutionHandler.incrementPollution(worldObj, xCoord, yCoord, zCoord, PollutionType.SOOT, PollutionHandler.SOOT_PER_SECOND / 20F);
 			}
 			
 			/* pour recipe stack */
@@ -212,7 +214,7 @@ public class TileEntityCrucible extends TileEntityMachineBase implements IGUIPro
 				
 				}
 
-				PollutionHandler.incrementPollution(worldObj, xCoord, yCoord, zCoord, PollutionType.SOOT, PollutionHandler.SOOT_PER_SECOND / 2F);
+				PollutionHandler.incrementPollution(worldObj, xCoord, yCoord, zCoord, PollutionType.SOOT, PollutionHandler.SOOT_PER_SECOND / 20F);
 			}
 
 			/* clean up stacks */
@@ -220,38 +222,47 @@ public class TileEntityCrucible extends TileEntityMachineBase implements IGUIPro
 			this.wasteStack.removeIf(x -> x.amount <= 0);
 			
 			/* sync */
-			NBTTagCompound data = new NBTTagCompound();
-			int[] rec = new int[recipeStack.size() * 2];
-			int[] was = new int[wasteStack.size() * 2];
-			for(int i = 0; i < recipeStack.size(); i++) { MaterialStack sta = recipeStack.get(i); rec[i * 2] = sta.material.id; rec[i * 2 + 1] = sta.amount; }
-			for(int i = 0; i < wasteStack.size(); i++) { MaterialStack sta = wasteStack.get(i); was[i * 2] = sta.material.id; was[i * 2 + 1] = sta.amount; }
-			data.setIntArray("rec", rec);
-			data.setIntArray("was", was);
-			data.setInteger("progress", progress);
-			data.setInteger("heat", heat);
-			this.networkPack(data, 25);
+			this.networkPackNT(25);
 		}
 	}
-
+	
 	@Override
-	public void networkUnpack(NBTTagCompound nbt) {
-		super.networkUnpack(nbt);
-
-		this.recipeStack.clear();
-		this.wasteStack.clear();
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeInt(progress);
+		buf.writeInt(heat);
 		
-		int[] rec = nbt.getIntArray("rec");
-		for(int i = 0; i < rec.length / 2; i++) {
-			recipeStack.add(new MaterialStack(Mats.matById.get(rec[i * 2]), rec[i * 2 + 1]));
+		buf.writeShort(recipeStack.size());
+		for(MaterialStack sta : recipeStack) {
+			buf.writeInt(sta.material.id);
+			buf.writeInt(sta.amount);
 		}
 		
-		int[] was = nbt.getIntArray("was");
-		for(int i = 0; i < was.length / 2; i++) {
-			wasteStack.add(new MaterialStack(Mats.matById.get(was[i * 2]), was[i * 2 + 1]));
+		buf.writeShort(wasteStack.size());
+		for(MaterialStack sta : wasteStack) {
+			buf.writeInt(sta.material.id);
+			buf.writeInt(sta.amount);
+		}
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		progress = buf.readInt();
+		heat = buf.readInt();
+		
+		recipeStack.clear();
+		wasteStack.clear();
+		
+		int mats = buf.readShort();
+		for(int i = 0; i < mats; i++) {
+			recipeStack.add(new MaterialStack(Mats.matById.get(buf.readInt()), buf.readInt()));
 		}
 		
-		this.progress = nbt.getInteger("progress");
-		this.heat = nbt.getInteger("heat");
+		mats = buf.readShort();
+		for(int i = 0; i < mats; i++) {
+			wasteStack.add(new MaterialStack(Mats.matById.get(buf.readInt()), buf.readInt()));
+		}
 	}
 	
 	@Override
@@ -407,7 +418,6 @@ public class TileEntityCrucible extends TileEntityMachineBase implements IGUIPro
 		//if there's no materials in there at all, don't smelt
 		if(materials.isEmpty())
 			return false;
-		
 		CrucibleRecipe recipe = getLoadedRecipe();
 		
 		//needs to be true, will always be true if there's no recipe loaded
@@ -509,7 +519,7 @@ public class TileEntityCrucible extends TileEntityMachineBase implements IGUIPro
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUICrucible(player.inventory, this);
 	}
 	
@@ -591,4 +601,18 @@ public class TileEntityCrucible extends TileEntityMachineBase implements IGUIPro
 
 	@Override public boolean canAcceptPartialFlow(World world, int x, int y, int z, ForgeDirection side, MaterialStack stack) { return false; }
 	@Override public MaterialStack flow(World world, int x, int y, int z, ForgeDirection side, MaterialStack stack) { return null; }
+
+	@Override
+	public int[] getMatsToCopy() {
+		ArrayList<Integer> types = new ArrayList<>();
+
+		for (MaterialStack stack : recipeStack) {
+			types.add(stack.material.id);
+		}
+		for (MaterialStack stack : wasteStack) {
+			types.add(stack.material.id);
+		}
+		return BobMathUtil.intCollectionToArray(types);
+	}
+
 }

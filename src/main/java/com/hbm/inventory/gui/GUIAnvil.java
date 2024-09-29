@@ -7,6 +7,7 @@ import java.util.Locale;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 
 import com.hbm.inventory.RecipesCommon.AStack;
 import com.hbm.inventory.RecipesCommon.ComparableStack;
@@ -16,8 +17,8 @@ import com.hbm.inventory.recipes.anvil.AnvilRecipes;
 import com.hbm.inventory.recipes.anvil.AnvilRecipes.AnvilConstructionRecipe;
 import com.hbm.inventory.recipes.anvil.AnvilRecipes.AnvilOutput;
 import com.hbm.lib.RefStrings;
-import com.hbm.packet.AnvilCraftPacket;
 import com.hbm.packet.PacketDispatcher;
+import com.hbm.packet.toserver.AnvilCraftPacket;
 
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.client.gui.FontRenderer;
@@ -284,7 +285,7 @@ public class GUIAnvil extends GuiContainer {
 
 		for(AStack stack : recipe.input) {
 			if(stack instanceof ComparableStack) {
-				ItemStack input = ((ComparableStack) stack).toStack();
+				ComparableStack input = (ComparableStack) stack;
 				boolean hasItem = false;
 				int amount = 0;
 				for(int i = 0; i < inventory.mainInventory.length; i++) {
@@ -292,15 +293,15 @@ public class GUIAnvil extends GuiContainer {
 					if(stackItem == null) {
 						continue;
 					}
-					if(stackItem.getItem() == input.getItem() && input.getItemDamage() == stackItem.getItemDamage()) {
+					if(input.matchesRecipe(stackItem, true)) {
 						hasItem = true;
 						amount += stackItem.stackSize;
 					}
 				}
 				if(hasItem && amount >= stack.stacksize) {
-					list.add(">" + input.stackSize + "x " + input.getDisplayName());
+					list.add(">" + input.stacksize + "x " + input.toStack().getDisplayName());
 				} else {
-					list.add(EnumChatFormatting.RED + ">" + input.stackSize + "x " + input.getDisplayName());
+					list.add(EnumChatFormatting.RED + ">" + input.stacksize + "x " + input.toStack().getDisplayName());
 				}
 			} else if(stack instanceof OreDictStack) {
 				OreDictStack input = (OreDictStack) stack;
@@ -353,7 +354,7 @@ public class GUIAnvil extends GuiContainer {
 		for(AStack stack : recipe.input) {
 			if(stack instanceof ComparableStack)  {
 				ItemStack input = ((ComparableStack) stack).toStack();
-				list.add(input.getDisplayName().toLowerCase(Locale.US));
+				try { list.add(input.getDisplayName().toLowerCase(Locale.US)); } catch(Exception ex) { list.add("I AM ERROR"); }
 				
 			} else if(stack instanceof OreDictStack) {
 				OreDictStack input = (OreDictStack) stack;
@@ -361,9 +362,8 @@ public class GUIAnvil extends GuiContainer {
 				
 				if(ores.size() > 0) {
 					for(ItemStack ore : ores) {
-						list.add(ore.getDisplayName().toLowerCase(Locale.US));
+						try { list.add(ore.getDisplayName().toLowerCase(Locale.US)); } catch(Exception ex) { list.add("I AM ERROR"); }
 					}
-					
 				}
 			}
 		}
@@ -427,6 +427,7 @@ public class GUIAnvil extends GuiContainer {
 			GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
 			RenderHelper.enableGUIStandardItemLighting();
 			GL11.glDisable(GL11.GL_LIGHTING);
+			GL11.glEnable(GL12.GL_RESCALE_NORMAL);
 			
 			AnvilConstructionRecipe recipe = recipes.get(i);
 			ItemStack display = recipe.getDisplay();
@@ -438,7 +439,7 @@ public class GUIAnvil extends GuiContainer {
 			itemRender.zLevel = 100.0F;
 			itemRender.renderItemAndEffectIntoGUI(font, this.mc.getTextureManager(), recipe.getDisplay(), guiLeft + 17 + 18 * (ind / 2), guiTop + 72 + 18 * (ind % 2));
 			itemRender.zLevel = 0.0F;
-			
+
 			GL11.glEnable(GL11.GL_ALPHA_TEST);
 			GL11.glDisable(GL11.GL_LIGHTING);
 			this.mc.getTextureManager().bindTexture(texture);

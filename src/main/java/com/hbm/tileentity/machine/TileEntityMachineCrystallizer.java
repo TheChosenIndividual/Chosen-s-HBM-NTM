@@ -2,7 +2,6 @@ package com.hbm.tileentity.machine;
 
 import java.util.List;
 
-import com.hbm.blocks.BlockDummyable;
 import com.hbm.blocks.ModBlocks;
 import com.hbm.extprop.HbmPlayerProps;
 import com.hbm.inventory.UpgradeManager;
@@ -15,6 +14,8 @@ import com.hbm.inventory.recipes.CrystallizerRecipes.CrystallizerRecipe;
 import com.hbm.items.machine.ItemMachineUpgrade;
 import com.hbm.items.machine.ItemMachineUpgrade.UpgradeType;
 import com.hbm.lib.Library;
+import com.hbm.main.MainRegistry;
+import com.hbm.tileentity.IFluidCopiable;
 import com.hbm.tileentity.IGUIProvider;
 import com.hbm.tileentity.IUpgradeInfoProvider;
 import com.hbm.tileentity.TileEntityMachineBase;
@@ -22,12 +23,12 @@ import com.hbm.util.BobMathUtil;
 import com.hbm.util.I18nUtil;
 import com.hbm.util.fauxpointtwelve.DirPos;
 
-import api.hbm.energy.IBatteryItem;
-import api.hbm.energy.IEnergyUser;
+import api.hbm.energymk2.IBatteryItem;
+import api.hbm.energymk2.IEnergyReceiverMK2;
 import api.hbm.fluid.IFluidStandardReceiver;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.gui.GuiScreen;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.ItemStack;
@@ -38,13 +39,14 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileEntityMachineCrystallizer extends TileEntityMachineBase implements IEnergyUser, IFluidStandardReceiver, IGUIProvider, IUpgradeInfoProvider {
+public class TileEntityMachineCrystallizer extends TileEntityMachineBase implements IEnergyReceiverMK2, IFluidStandardReceiver, IGUIProvider, IUpgradeInfoProvider, IFluidCopiable {
 	
 	public long power;
 	public static final long maxPower = 1000000;
 	public static final int demand = 1000;
 	public short progress;
 	public short duration = 600;
+	public boolean isOn;
 	
 	public float angle;
 	public float prevAngle;
@@ -53,7 +55,7 @@ public class TileEntityMachineCrystallizer extends TileEntityMachineBase impleme
 
 	public TileEntityMachineCrystallizer() {
 		super(8);
-		tank = new FluidTank(Fluids.ACID, 8000);
+		tank = new FluidTank(Fluids.PEROXIDE, 8000);
 	}
 
 	@Override
@@ -65,6 +67,8 @@ public class TileEntityMachineCrystallizer extends TileEntityMachineBase impleme
 	public void updateEntity() {
 		
 		if(!worldObj.isRemote) {
+			
+			this.isOn = false;
 			
 			this.updateConnections();
 			
@@ -80,6 +84,7 @@ public class TileEntityMachineCrystallizer extends TileEntityMachineBase impleme
 					
 					progress++;
 					power -= getPowerRequired();
+					isOn = true;
 					
 					if(progress > getDuration()) {
 						progress = 0;
@@ -93,29 +98,28 @@ public class TileEntityMachineCrystallizer extends TileEntityMachineBase impleme
 				}
 			}
 			
-			NBTTagCompound data = new NBTTagCompound();
-			data.setShort("progress", progress);
-			data.setShort("duration", getDuration());
-			data.setLong("power", power);
-			tank.writeToNBT(data, "t");
-			this.networkPack(data, 25);
+			this.networkPackNT(25);
 		} else {
 			
 			prevAngle = angle;
 			
-			if(progress > 0) {
+			if(isOn) {
 				angle += 5F * this.getCycleCount();
 				
 				if(angle >= 360) {
 					angle -= 360;
 					prevAngle -= 360;
 				}
+				
+				if(worldObj.rand.nextInt(20) == 0 && MainRegistry.proxy.me().getDistance(xCoord + 0.5, yCoord + 6, zCoord + 0.5) < 50) {
+					worldObj.spawnParticle("cloud", xCoord + worldObj.rand.nextDouble(), yCoord + 6.5D, zCoord + worldObj.rand.nextDouble(), 0.0, 0.1, 0.0);
+				}
 			}
 		}
 		
 		ForgeDirection dir = ForgeDirection.getOrientation(this.getBlockMetadata() - 10);
 		ForgeDirection rot = dir.getRotation(ForgeDirection.UP);
-		List<EntityPlayer> players = worldObj.getEntitiesWithinAABB(EntityPlayer.class, AxisAlignedBB.getBoundingBox(xCoord, yCoord, zCoord, xCoord + 1, yCoord + 6.875, zCoord + 1).offset(dir.offsetX * 0.75 + rot.offsetX * 1.25, 0, dir.offsetZ * 0.75 + rot.offsetZ * 1.25));
+		List<EntityPlayer> players = worldObj.getEntitiesWithinAABB(EntityPlayer.class, AxisAlignedBB.getBoundingBox(xCoord + 0.25, yCoord + 1, zCoord + 0.25, xCoord + 0.75, yCoord + 6, zCoord + 0.75).offset(rot.offsetX * 1.5, 0, rot.offsetZ * 1.5));
 		
 		for(EntityPlayer player : players) {
 			HbmPlayerProps props = HbmPlayerProps.getData(player);
@@ -133,34 +137,36 @@ public class TileEntityMachineCrystallizer extends TileEntityMachineBase impleme
 	
 	protected DirPos[] getConPos() {
 
-		ForgeDirection dir = ForgeDirection.getOrientation(this.getBlockMetadata() - BlockDummyable.offset);
-
-		if(dir == ForgeDirection.NORTH || dir == ForgeDirection.SOUTH) {
-			
-			return new DirPos[] {
-				new DirPos(xCoord + 2, yCoord + 5, zCoord, Library.POS_X),
-				new DirPos(xCoord - 2, yCoord + 5, zCoord, Library.NEG_X)
-			};
-		}
-
-		if(dir == ForgeDirection.EAST || dir == ForgeDirection.WEST) {
-			
-			return new DirPos[] {
-				new DirPos(xCoord, yCoord + 5, zCoord + 2, Library.POS_Z),
-				new DirPos(xCoord, yCoord + 5, zCoord - 2, Library.NEG_Z)
-			};
-		}
-		
-		return new DirPos[0];
+		return new DirPos[] {
+				new DirPos(xCoord + 2, yCoord, zCoord + 1, Library.POS_X),
+				new DirPos(xCoord + 2, yCoord, zCoord - 1, Library.POS_X),
+				new DirPos(xCoord - 2, yCoord, zCoord + 1, Library.NEG_X),
+				new DirPos(xCoord - 2, yCoord, zCoord - 1, Library.NEG_X),
+				new DirPos(xCoord + 1, yCoord, zCoord + 2, Library.POS_Z),
+				new DirPos(xCoord - 1, yCoord, zCoord + 2, Library.POS_Z),
+				new DirPos(xCoord + 1, yCoord, zCoord - 2, Library.NEG_Z),
+				new DirPos(xCoord - 1, yCoord, zCoord - 2, Library.NEG_Z)
+		};
 	}
 	
-	public void networkUnpack(NBTTagCompound data) {
-		super.networkUnpack(data);
-		
-		this.power = data.getLong("power");
-		this.progress = data.getShort("progress");
-		this.duration = data.getShort("duration");
-		this.tank.readFromNBT(data, "t");
+	@Override
+	public void serialize(ByteBuf buf) {
+		super.serialize(buf);
+		buf.writeShort(progress);
+		buf.writeShort(getDuration());
+		buf.writeLong(power);
+		buf.writeBoolean(isOn);
+		tank.serialize(buf);
+	}
+	
+	@Override
+	public void deserialize(ByteBuf buf) {
+		super.deserialize(buf);
+		progress = buf.readShort();
+		duration = buf.readShort();
+		power = buf.readLong();
+		isOn = buf.readBoolean();
+		tank.deserialize(buf);
 	}
 	
 	private void processItem() {
@@ -356,7 +362,7 @@ public class TileEntityMachineCrystallizer extends TileEntityMachineBase impleme
 
 	@Override
 	@SideOnly(Side.CLIENT)
-	public GuiScreen provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
+	public Object provideGUI(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		return new GUICrystallizer(player.inventory, this);
 	}
 
@@ -385,7 +391,17 @@ public class TileEntityMachineCrystallizer extends TileEntityMachineBase impleme
 	public int getMaxLevel(UpgradeType type) {
 		if(type == UpgradeType.SPEED) return 3;
 		if(type == UpgradeType.EFFECT) return 3;
-		if(type == UpgradeType.OVERDRIVE) return 2;
+		if(type == UpgradeType.OVERDRIVE) return 3;
 		return 0;
+	}
+
+	@Override
+	public int[] getFluidIDToCopy() {
+		return new int[]{ tank.getTankType().getID()};
+	}
+
+	@Override
+	public FluidTank getTankToPaste() {
+		return tank;
 	}
 }

@@ -9,6 +9,7 @@ import com.hbm.handler.pollution.PollutionHandler.PollutionType;
 import com.hbm.items.armor.IArmorDisableModel;
 import com.hbm.items.armor.IArmorDisableModel.EnumPlayerPart;
 import com.hbm.packet.PermaSyncHandler;
+import com.hbm.render.item.weapon.sedna.ItemRenderWeaponBase;
 import com.hbm.render.model.ModelMan;
 import com.hbm.world.biome.BiomeGenCraterBase;
 
@@ -33,11 +34,15 @@ import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.BiomeGenBase;
+import net.minecraftforge.client.IItemRenderer;
+import net.minecraftforge.client.IItemRenderer.ItemRenderType;
+import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.client.event.DrawBlockHighlightEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.EntityViewRenderEvent.FogColors;
 import net.minecraftforge.client.event.EntityViewRenderEvent.FogDensity;
 import net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType;
+import net.minecraftforge.client.event.RenderHandEvent;
 import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.common.ForgeModContainer;
 
@@ -401,11 +406,27 @@ public class ModEventHandlerRenderer {
 	@SubscribeEvent
 	public void onRenderHUD(RenderGameOverlayEvent.Pre event) {
 		
-		if(event.type == ElementType.HOTBAR && (ModEventHandlerClient.flashTimestamp + ModEventHandlerClient.flashDuration - System.currentTimeMillis()) > 0) {
-			double mult = (ModEventHandlerClient.flashTimestamp + ModEventHandlerClient.flashDuration - System.currentTimeMillis()) / (double) ModEventHandlerClient.flashDuration * 2;
-			double horizontal = MathHelper.clamp_double(Math.sin(System.currentTimeMillis() * 0.02), -0.7, 0.7) * 5;
-			double vertical = MathHelper.clamp_double(Math.sin(System.currentTimeMillis() * 0.01 + 2), -0.7, 0.7) * 1;
+		if(event.type == ElementType.HOTBAR && (ModEventHandlerClient.shakeTimestamp + ModEventHandlerClient.shakeDuration - System.currentTimeMillis()) > 0) {
+			double mult = (ModEventHandlerClient.shakeTimestamp + ModEventHandlerClient.shakeDuration - System.currentTimeMillis()) / (double) ModEventHandlerClient.shakeDuration * 2;
+			double horizontal = MathHelper.clamp_double(Math.sin(System.currentTimeMillis() * 0.02), -0.7, 0.7) * 15;
+			double vertical = MathHelper.clamp_double(Math.sin(System.currentTimeMillis() * 0.01 + 2), -0.7, 0.7) * 3;
 			GL11.glTranslated(horizontal * mult, vertical * mult, 0);
+		}
+	}
+
+	@SubscribeEvent
+	public void onRenderHand(RenderHandEvent event) {
+		
+		//can't use plaxer.getHeldItem() here because the item rendering persists for a few frames after hitting the switch key
+		ItemStack toRender = Minecraft.getMinecraft().entityRenderer.itemRenderer.itemToRender;
+		
+		if(toRender != null) {
+			IItemRenderer renderer = MinecraftForgeClient.getItemRenderer(toRender, ItemRenderType.EQUIPPED_FIRST_PERSON);
+			
+			if(renderer instanceof ItemRenderWeaponBase) {
+				((ItemRenderWeaponBase) renderer).setPerspectiveAndRender(toRender, event.partialTicks);
+				event.setCanceled(true);
+			}
 		}
 	}
 
@@ -414,19 +435,22 @@ public class ModEventHandlerRenderer {
 	private static int fogZ;
 	private static Vec3 fogRGBMultiplier;
 	private static boolean doesBiomeApply = false;
+	private static long fogTimer = 0;
 	
 	/** Same procedure as getting the blended sky color but for fog */
 	public static Vec3 getFogBlendColor(World world, int playerX, int playerZ, float red, float green, float blue, double partialTicks) {
 		
-		if(playerX == fogX && playerZ == fogZ && fogInit) return fogRGBMultiplier;
-		
+		long millis = System.currentTimeMillis() - fogTimer;
+		if(playerX == fogX && playerZ == fogZ && fogInit && millis < 3000) return fogRGBMultiplier;
+
 		fogInit = true;
+		fogTimer = System.currentTimeMillis();
 		GameSettings settings = Minecraft.getMinecraft().gameSettings;
 		int[] ranges = ForgeModContainer.blendRanges;
 		int distance = 0;
 		
-		if(settings.fancyGraphics && settings.renderDistanceChunks >= 0 && settings.renderDistanceChunks < ranges.length) {
-			distance = ranges[settings.renderDistanceChunks];
+		if(settings.fancyGraphics && settings.renderDistanceChunks >= 0) {
+			distance = ranges[Math.min(settings.renderDistanceChunks, ranges.length - 1)];
 		}
 
 		float r = 0F;
@@ -450,7 +474,12 @@ public class ModEventHandlerRenderer {
 		fogX = playerX;
 		fogZ = playerZ;
 		
-		if(doesBiomeApply) fogRGBMultiplier = Vec3.createVectorHelper(r / divider, g / divider, b / divider);
+		if(doesBiomeApply) {
+			fogRGBMultiplier = Vec3.createVectorHelper(r / divider, g / divider, b / divider);
+		} else {
+			fogRGBMultiplier = null;
+		}
+
 		return fogRGBMultiplier;
 	}
 	
